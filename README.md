@@ -1,4 +1,4 @@
 EntryArduino
 ============
 
-EntryArduino
+EntryArduino program for entry.
