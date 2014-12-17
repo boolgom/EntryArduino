@@ -33,13 +33,13 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	LoadString(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
 	LoadString(hInstance, IDC_ENTRYARDUINO, szWindowClass, MAX_LOADSTRING);
 	MyRegisterClass(hInstance);
-
+	 
 	// Perform application initialization:
 	if (!InitInstance (hInstance, nCmdShow))
 	{
 		return FALSE;
 	}
-
+	
 	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_ENTRYARDUINO));
 
 	// Main message loop:
@@ -95,22 +95,41 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 //
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
-   HWND hWnd;
+	HWND hWnd;
+	DWORD       dwStyle;
+	TCHAR greeting[] = _T("Hello, World!");
+	HDC hdc;
+	PAINTSTRUCT ps;
+	dwStyle = (WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
 
-   hInst = hInstance; // Store instance handle in our global variable
+	hInst = hInstance; // Store instance handle in our global variable
 
-   hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
+	hWnd = CreateWindow(
+		szWindowClass, 
+		_T("Entry Arduino"),
+		dwStyle,
+		CW_USEDEFAULT, 
+		CW_USEDEFAULT, 
+		500, 
+		300, 
+		NULL, 
+		NULL, 
+		hInstance, 
+		NULL
+	);
 
-   if (!hWnd)
-   {
-      return FALSE;
-   }
+	if (!hWnd)
+	{
+		return FALSE;
+	}
 
-   ShowWindow(hWnd, nCmdShow);
-   UpdateWindow(hWnd);
-
-   return TRUE;
+	ShowWindow(hWnd, nCmdShow);
+	hdc = BeginPaint(hWnd, &ps);
+	TextOut(hdc,
+		40, 50,
+		greeting, _tcslen(greeting));
+	UpdateWindow(hWnd);
+	return TRUE;
 }
 
 //
