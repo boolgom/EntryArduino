@@ -3,19 +3,27 @@
 
 #include "stdafx.h"
 #include "EntryArduino.h"
+#include "Serial.h"
 
 #define MAX_LOADSTRING 100
+#define UPDATE_INTERVAL 1000
 
 // Global Variables:
 HINSTANCE hInst;								// current instance
 TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
+char ddata[100];
 
 // Forward declarations of functions included in this code module:
 ATOM				MyRegisterClass(HINSTANCE hInstance);
 BOOL				InitInstance(HINSTANCE, int);
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
+CHAR CALLBACK		readSerial(HWND);
+BOOL WriteABuffer(char * lpBuf, DWORD);
+VOID CALLBACK TimerProc(HWND, UINT, UINT, DWORD);
+HANDLE hComm;
+Serial* SP;
 
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -24,6 +32,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 {
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
+
 
  	// TODO: Place code here.
 	MSG msg;
@@ -41,16 +50,27 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	}
 	
 	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_ENTRYARDUINO));
+	
+	SP = new Serial("\\\\.\\COM5");
+	if (SP->IsConnected()) {
+	}
+		
+	
+	UINT timer = SetTimer(NULL, 0, UPDATE_INTERVAL, &TimerProc);
 
 	// Main message loop:
 	while (GetMessage(&msg, NULL, 0, 0))
 	{
+
 		if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
 		{
+
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}
 	}
+
+	KillTimer(NULL, timer);
 
 	return (int) msg.wParam;
 }
@@ -124,10 +144,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	}
 
 	ShowWindow(hWnd, nCmdShow);
-	hdc = BeginPaint(hWnd, &ps);
-	TextOut(hdc,
-		40, 50,
-		greeting, _tcslen(greeting));
+
 	UpdateWindow(hWnd);
 	return TRUE;
 }
@@ -154,10 +171,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		wmId    = LOWORD(wParam);
 		wmEvent = HIWORD(wParam);
 		// Parse the menu selections:
+
 		switch (wmId)
 		{
 		case IDM_ABOUT:
-			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+			readSerial(hWnd);
+			SendMessage(hWnd,
+				WM_PAINT,
+				NULL,
+				NULL);
 			break;
 		case IDM_EXIT:
 			DestroyWindow(hWnd);
@@ -167,14 +189,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		}
 		break;
 	case WM_PAINT:
+		TCHAR mes[100];
 		hdc = BeginPaint(hWnd, &ps);
 		// TODO: Add any drawing code here...
+		MultiByteToWideChar(CP_ACP, 0, ddata, strlen(ddata), mes, 100);
+		TextOut(hdc,
+			40, 50,
+			mes, strlen(ddata));
 		EndPaint(hWnd, &ps);
 		break;
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		break;
 	default:
+
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
 	return 0;
@@ -199,3 +227,107 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	}
 	return (INT_PTR)FALSE;
 }
+
+CHAR CALLBACK readSerial(HWND hWnd) {
+	DWORD dwRead;
+	BOOL fWaitingOnRead = FALSE;
+	OVERLAPPED osReader = { 0 };
+	TCHAR lpBuf[MAX_LOADSTRING];
+
+	// Create the overlapped event. Must be closed before exiting
+	// to avoid a handle leak.
+	osReader.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+	if (osReader.hEvent == NULL) {
+	}
+	else {
+		// Error creating overlapped event; abort.
+
+		if (!fWaitingOnRead) {
+			// Issue read operation.
+			if (!ReadFile(hComm, ddata, MAX_LOADSTRING, &dwRead, &osReader)) {
+
+				if (GetLastError() != ERROR_IO_PENDING) {
+				}
+				else {
+					fWaitingOnRead = TRUE;
+					strcpy_s(ddata, "asdf");
+
+					char nullValue[100];
+					WriteABuffer(nullValue, NULL);
+				}
+			}
+			else {
+				ddata[dwRead] = NULL;
+			}
+		}
+	}
+
+	TCHAR mes[100];
+	return *ddata;
+}
+
+VOID CALLBACK TimerProc(HWND hWnd, UINT nMsg, UINT nIDEvent, DWORD dwTime) {
+
+	//readSerial(hWnd);
+	/*
+	PAINTSTRUCT ps;
+	HDC hdc;
+	TCHAR mes[100];
+	hdc = BeginPaint(hWnd, &ps);
+	// TODO: Add any drawing code here...
+	MultiByteToWideChar(CP_ACP, 0, ddata, strlen(ddata), mes, 100);
+	TextOut(hdc,
+		40, 50,
+		mes, strlen(ddata));
+	EndPaint(hWnd, &ps);*/
+	int dataLength = 256;
+	int readResult = 0;
+	if (SP->IsConnected()) {
+		readResult = SP->ReadData(ddata, dataLength);
+		MessageBox(hWnd, NULL, NULL, NULL);
+	}
+	else {
+		strcpy_s(ddata, "not connected");
+	}
+	InvalidateRect(hWnd, NULL, TRUE);
+	UpdateWindow(hWnd);
+	return;
+}
+
+BOOL WriteABuffer(char * lpBuf, DWORD dwToWrite)
+{
+	OVERLAPPED osWrite = { 0 };
+	DWORD dwWritten;
+	BOOL fRes;
+
+	// Create this writes OVERLAPPED structure hEvent.
+	osWrite.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if (osWrite.hEvent == NULL)
+		// Error creating overlapped event handle.
+		return FALSE;
+
+	// Issue write.
+	if (!WriteFile(hComm, lpBuf, dwToWrite, &dwWritten, &osWrite)) {
+		if (GetLastError() != ERROR_IO_PENDING) {
+			// WriteFile failed, but it isn't delayed. Report error and abort.
+			fRes = FALSE;
+		}
+		else {
+			// Write is pending.
+			if (!GetOverlappedResult(hComm, &osWrite, &dwWritten, TRUE))
+				fRes = FALSE;
+			else
+				// Write operation completed successfully.
+				fRes = TRUE;
+		}
+	}
+	else
+		// WriteFile completed immediately.
+		fRes = TRUE;
+
+	CloseHandle(osWrite.hEvent);
+	return fRes;
+}
+
+
