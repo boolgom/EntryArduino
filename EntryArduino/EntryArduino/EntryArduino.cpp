@@ -6,7 +6,7 @@
 #include "Serial.h"
 
 #define MAX_LOADSTRING 100
-#define UPDATE_INTERVAL 200
+#define UPDATE_INTERVAL 1000
 
 // Global Variables:
 HINSTANCE hInst;								// current instance
@@ -22,7 +22,6 @@ INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
 CHAR CALLBACK		readSerial(HWND);
 BOOL WriteABuffer(char * lpBuf, DWORD);
 VOID CALLBACK TimerProc(HWND, UINT, UINT, DWORD);
-VOID SyncSerial();
 HANDLE hComm;
 Serial* SP;
 
@@ -54,11 +53,10 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	
 	SP = new Serial("\\\\.\\COM5");
 	if (SP->IsConnected()) {
-		SyncSerial();
 	}
 		
 	
-	
+	UINT timer = SetTimer(NULL, 0, UPDATE_INTERVAL, &TimerProc);
 
 	// Main message loop:
 	while (GetMessage(&msg, NULL, 0, 0))
@@ -71,6 +69,8 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 			DispatchMessage(&msg);
 		}
 	}
+
+	KillTimer(NULL, timer);
 
 	return (int) msg.wParam;
 }
@@ -146,9 +146,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	ShowWindow(hWnd, nCmdShow);
 
 	UpdateWindow(hWnd);
-
-	UINT timer = SetTimer(hWnd, 0, UPDATE_INTERVAL, &TimerProc);
-
 	return TRUE;
 }
 
@@ -178,6 +175,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		switch (wmId)
 		{
 		case IDM_ABOUT:
+			readSerial(hWnd);
+			SendMessage(hWnd,
+				WM_PAINT,
+				NULL,
+				NULL);
 			break;
 		case IDM_EXIT:
 			DestroyWindow(hWnd);
@@ -267,38 +269,31 @@ CHAR CALLBACK readSerial(HWND hWnd) {
 
 VOID CALLBACK TimerProc(HWND hWnd, UINT nMsg, UINT nIDEvent, DWORD dwTime) {
 
-	//SyncSerial();
+	//readSerial(hWnd);
 	/*
-	if (SP->IsConnected()) {
-		//SyncSerial();
-	}*/
+	PAINTSTRUCT ps;
+	HDC hdc;
+	TCHAR mes[100];
+	hdc = BeginPaint(hWnd, &ps);
+	// TODO: Add any drawing code here...
+	MultiByteToWideChar(CP_ACP, 0, ddata, strlen(ddata), mes, 100);
+	TextOut(hdc,
+		40, 50,
+		mes, strlen(ddata));
+	EndPaint(hWnd, &ps);*/
 	int dataLength = 256;
 	int readResult = 0;
-	char incomingData[256] = "";
-	this::SP->IsConnected();
-	//readResult = SP->ReadData(incomingData, dataLength);
-	//InvalidateRect(hWnd, NULL, TRUE);
-	//UpdateWindow(hWnd);
+	if (SP->IsConnected()) {
+		readResult = SP->ReadData(ddata, dataLength);
+		MessageBox(hWnd, NULL, NULL, NULL);
+	}
+	else {
+		strcpy_s(ddata, "not connected");
+	}
+	InvalidateRect(hWnd, NULL, TRUE);
+	UpdateWindow(hWnd);
 	return;
 }
-
-VOID SyncSerial() {
-	//while (SP->IsConnected()) {
-		int dataLength = 256;
-		int readResult = 0;
-
-		if (SP->IsConnected()) {
-			readResult = SP->ReadData(ddata, dataLength);
-		}
-		else {
-			strcpy_s(ddata, "not connected");
-		}
-		//Sleep(200);
-		//SyncSerial();
-	//}
-
-}
-
 
 BOOL WriteABuffer(char * lpBuf, DWORD dwToWrite)
 {
