@@ -3,6 +3,8 @@
 
 #include "stdafx.h"
 #include "EntryArduino.h"
+#include "Serial.h"
+#include <atlstr.h>
 
 #define MAX_LOADSTRING 100
 
@@ -11,11 +13,15 @@ HINSTANCE hInst;								// current instance
 TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
 
+char InputData[256];
+
 // Forward declarations of functions included in this code module:
 ATOM				MyRegisterClass(HINSTANCE hInstance);
 BOOL				InitInstance(HINSTANCE, int);
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
+VOID CALLBACK ReadSerial();
+Serial* SP = NULL;
 
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -39,6 +45,9 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	{
 		return FALSE;
 	}
+
+	SP = new Serial("\\\\.\\COM5");
+	ReadSerial();
 
 	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_ENTRYARDUINO));
 
@@ -97,7 +106,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
 	HWND hWnd;
 	DWORD       dwStyle;
-	TCHAR greeting[] = _T("Hello, World!");
 	HDC hdc;
 	PAINTSTRUCT ps;
 	dwStyle = (WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
@@ -124,10 +132,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		
 	ShowWindow(hWnd, nCmdShow);
 	hdc = BeginPaint(hWnd, &ps);
-	TextOut(hdc,
-		40, 50,
-		greeting, _tcslen(greeting));
-	UpdateWindow(hWnd);
+
 	return TRUE;
 }
 
@@ -168,6 +173,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_PAINT:
 		hdc = BeginPaint(hWnd, &ps);
 		// TODO: Add any drawing code here...
+		TextOut(hdc,
+			40, 50,
+			CA2W(InputData), _tcslen(CA2W(InputData)));
 		EndPaint(hWnd, &ps);
 		break;
 	case WM_DESTROY:
@@ -197,4 +205,15 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	}
 	return (INT_PTR)FALSE;
+}
+
+VOID CALLBACK ReadSerial()
+{
+	if (SP->IsConnected()) {
+		char incomingData[256] = "";
+		int dataLength = 256;
+		int readResult = 0;
+		readResult = SP->ReadData(incomingData, dataLength);
+		strcpy_s(InputData, incomingData);
+	}
 }
