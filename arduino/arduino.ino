@@ -6,7 +6,7 @@ int val = 0;         // variable to store the read value
 
 
 void setup(){
-  Serial.begin(9600);
+  Serial.begin(38400);
 }
 
 void loop(){

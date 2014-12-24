@@ -172,22 +172,6 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	closesocket(ClientSocket);
 	WSACleanup();
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_ENTRYARDUINO));
 
 	// Main message loop:
