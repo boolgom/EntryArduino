@@ -195,8 +195,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		// TODO: Add any drawing code here...
 		TextOut(hdc,
 			40, 50,
-			CA2W(InputData), _tcslen(CA2W(InputData)));
+			L"connected", _tcslen(L"connected"));
 		EndPaint(hWnd, &ps);
+		RECT rect;
 		break;
 	case WM_DESTROY:
 		// shutdown the connection since we're done
@@ -380,8 +381,10 @@ VOID CALLBACK InitSocket(HWND hWnd)
 	}
 
 	// No longer need server socket
+	RECT rect;
 	closesocket(ListenSocket);
-
+	GetClientRect(hWnd, &rect);
+	InvalidateRect(hWnd, &rect, TRUE);
 
 	WSAAsyncSelect(ClientSocket,
 		hWnd,
