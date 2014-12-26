@@ -11,5 +11,5 @@ void setup(){
 
 void loop(){
    val = analogRead(analogPin);
-   int bytesSent = Serial.write(val, DEC); 
+   int bytesSent = Serial.println(val, DEC); 
 }

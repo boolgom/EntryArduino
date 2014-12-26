@@ -59,8 +59,16 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 		return FALSE;
 	}
 
-	SP = new Serial("\\\\.\\COM5");
-	ReadSerial();
+	int port = 1;
+	char portName[12];
+	do {
+		sprintf_s(portName, "\\\\.\\COM%d", port);
+		SP = new Serial(portName);
+		if (port < 50)
+			port++;
+		else
+			port = 1;
+	} while (!(SP->IsConnected()));
 
 	
 	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_ENTRYARDUINO));

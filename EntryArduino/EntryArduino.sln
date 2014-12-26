@@ -15,6 +15,7 @@ Global
 		{8B54E55A-051B-4F28-B786-BEC78670549F}.Debug|Win32.Build.0 = Debug|Win32
 		{8B54E55A-051B-4F28-B786-BEC78670549F}.Release|Win32.ActiveCfg = Release|Win32
 		{8B54E55A-051B-4F28-B786-BEC78670549F}.Release|Win32.Build.0 = Release|Win32
+		{8B54E55A-051B-4F28-B786-BEC78670549F}.Release|Win32.Deploy.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
