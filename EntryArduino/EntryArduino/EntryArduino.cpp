@@ -59,7 +59,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 		return FALSE;
 	}
 
-	int port = 1;
+	int port = 2;
 	char portName[12];
 	do {
 		sprintf_s(portName, "\\\\.\\COM%d", port);
@@ -312,8 +312,6 @@ VOID CALLBACK ReadSerial()
 	int dataLength = BUFFER_SIZE;
 
 	if (SP->IsConnected()) {
-		
-
 		readResult = SP->ReadData(InputData, dataLength);
 	}
 
