@@ -149,7 +149,10 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		
 	ShowWindow(hWnd, nCmdShow);
 	hdc = BeginPaint(hWnd, &ps);
+
+
 	InitSocket(hWnd);
+
 	return TRUE;
 }
 
@@ -172,6 +175,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	switch (message)
 	{
 	case WM_CREATE:
+
 
 		break;
 	case WM_COMMAND:
@@ -217,51 +221,53 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	case WM_SOCKET:
 	{
-		switch (WSAGETSELECTEVENT(lParam))
-		{
-		case FD_READ:
-		{
-			char szIncoming[1024];
-			ZeroMemory(szIncoming, sizeof(szIncoming));
+		if (ClientSocket != INVALID_SOCKET) {
+			switch (WSAGETSELECTEVENT(lParam))
+			{
+				case FD_READ:
+				{
+					char szIncoming[1024];
+					ZeroMemory(szIncoming, sizeof(szIncoming));
 
-			int inDataLength = recv(ClientSocket,
-				(char*)szIncoming,
-				sizeof(szIncoming) / sizeof(szIncoming[0]),
-				0);
+					int inDataLength = recv(ClientSocket,
+						(char*)szIncoming,
+						sizeof(szIncoming) / sizeof(szIncoming[0]),
+						0);
 
-			int iResult;
-			int iSendResult;
-			char recvbuf[BUFFER_SIZE];
-			int recvbuflen = BUFFER_SIZE;
-			iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
-			send(ClientSocket, InputData, readResult, 0);
+					int iResult;
+					int iSendResult;
+					char recvbuf[BUFFER_SIZE];
+					int recvbuflen = BUFFER_SIZE;
+					iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
+					send(ClientSocket, InputData, readResult, 0);
 
 			
-			SendMessage(NULL,
-				WM_SETTEXT,
-				sizeof(szIncoming)-1,
-				reinterpret_cast<LPARAM>(&szHistory));
-		}
-			break;
+					SendMessage(NULL,
+						WM_SETTEXT,
+						sizeof(szIncoming)-1,
+						reinterpret_cast<LPARAM>(&szHistory));
+				}
+					break;
 
-		case FD_CLOSE:
-		{
-			closesocket(ClientSocket);
-			SendMessage(hWnd, WM_DESTROY, NULL, NULL);
-		}
-			break;
+				case FD_CLOSE:
+				{
+					closesocket(ClientSocket);
+					InitSocket(hWnd);
+				}
+					break;
 
-		case FD_ACCEPT:
-		{
-			int size = sizeof(sockaddr);
-			ClientSocket = accept(ListenSocket, NULL, NULL);
-			if (ClientSocket == INVALID_SOCKET)
-			{
-				int nret = WSAGetLastError();
-				WSACleanup();
+				case FD_ACCEPT:
+				{
+					int size = sizeof(sockaddr);
+					ClientSocket = accept(ListenSocket, NULL, NULL);
+					if (ClientSocket == INVALID_SOCKET)
+					{
+						int nret = WSAGetLastError();
+						WSACleanup();
+					}
+				}
+				break;
 			}
-		}
-			break;
 		}
 	}
 	default:
