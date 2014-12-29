@@ -2,17 +2,22 @@
 //
 
 #include "stdafx.h"
+#include "handshake.h"
 #include "EntryArduino.h"
 #include "Serial.h"
 #include <atlstr.h>
 #include "sckt.h"
+#include <regex>
+#include <string.h>
+#include "base64.h"
+#include "sha1.h"
 
 #define MAX_LOADSTRING 100
 #define BUFFER_SIZE 10000
 #define DEFAULT_PORT "23518"
 #define SERIAL_INTERVAL 20
 #define WM_SOCKET		104
-
+#define SERVER_HASH_KEY "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 char szHistory[10000];
 
 // Global Variables:
@@ -30,10 +35,12 @@ INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
 VOID CALLBACK ReadSerial();
 VOID CALLBACK InitSocket(HWND hWnd);
 Serial* SP = NULL;
+handshake* hs = NULL;
 
 SOCKET ClientSocket = INVALID_SOCKET;
 SOCKET ListenSocket = INVALID_SOCKET;
 int readResult = 0;
+std::string serverHash;
 
 
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
@@ -158,6 +165,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	ShowWindow(hWnd, nCmdShow);
 	hdc = BeginPaint(hWnd, &ps);
 
+	hs = new handshake();
 
 	InitSocket(hWnd);
 
@@ -229,53 +237,111 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	case WM_SOCKET:
 	{
-		if (ClientSocket != INVALID_SOCKET) {
-			switch (WSAGETSELECTEVENT(lParam))
+		switch (WSAGETSELECTEVENT(lParam))
+		{
+			case FD_READ:
 			{
-				case FD_READ:
+				char szIncoming[1024];
+				ZeroMemory(szIncoming, sizeof(szIncoming));
+
+				int inDataLength = recv(ClientSocket,
+					(char*)szIncoming,
+					sizeof(szIncoming) / sizeof(szIncoming[0]),
+					0);
+				iResult = recv(ClientSocket, szIncoming, inDataLength, 0);
+				
+				char * pch;
+				char * context;
+				pch = strtok_s(szIncoming, "\n", &context);
+				char hashHeader[20] = "Sec-WebSocket-Key: ";
+				/*
+				iResult = hs->parseHandshake(szIncoming, strlen(pch));
+				if (iResult != OPENING_FRAME)
+					MessageBox(NULL, L"fail", NULL, NULL);
+				serverHash = hs->answerHandshake();
+				*/
+				while (pch != NULL)
 				{
-					char szIncoming[1024];
-					ZeroMemory(szIncoming, sizeof(szIncoming));
+					if (strncmp(pch, hashHeader, 18) == 0) {
 
-					int inDataLength = recv(ClientSocket,
-						(char*)szIncoming,
-						sizeof(szIncoming) / sizeof(szIncoming[0]),
-						0);
 
-					int iResult;
-					int iSendResult;
-					char recvbuf[BUFFER_SIZE];
-					int recvbuflen = BUFFER_SIZE;
-					iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
-					send(ClientSocket, InputData, readResult, 0);
+						std::string clientHash;
+						clientHash = pch;
+						clientHash = clientHash.substr(18, clientHash.length() - 18);
+						serverHash = clientHash + SERVER_HASH_KEY;
 
-			
-					SendMessage(NULL,
-						WM_SETTEXT,
-						sizeof(szIncoming)-1,
-						reinterpret_cast<LPARAM>(&szHistory));
-				}
-					break;
+						SHA1 sha;
+						sha.Input(serverHash.data(), serverHash.size());
+						unsigned char digest[20];
+						sha.Result((unsigned*)digest);
+						for (int i = 0; i<20; i += 4) {
+							unsigned char c;
 
-				case FD_CLOSE:
-				{
-					closesocket(ClientSocket);
-					InitSocket(hWnd);
-				}
-					break;
+							c = digest[i];
+							digest[i] = digest[i + 3];
+							digest[i + 3] = c;
 
-				case FD_ACCEPT:
-				{
-					int size = sizeof(sockaddr);
-					ClientSocket = accept(ListenSocket, NULL, NULL);
-					if (ClientSocket == INVALID_SOCKET)
-					{
-						int nret = WSAGetLastError();
-						WSACleanup();
+							c = digest[i + 1];
+							digest[i + 1] = digest[i + 2];
+							digest[i + 2] = c;
+						}
+
+						serverHash = base64_encode((const unsigned char *)digest, 20);
+
 					}
+					pch = strtok_s(NULL, "\n", &context);
 				}
-				break;
+				PostMessage(hWnd, WM_SOCKET, wParam, FD_WRITE);
 			}
+
+				break;
+
+
+			case FD_WRITE:
+			{
+				std::string header;
+				header = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection : Upgrade\r\nSec-WebSocket-Accept : " + serverHash + "\r\nSec-WebSocket-Protocol : chat\r\n\r\n";
+
+				MessageBox(NULL, CA2W(header.c_str()), NULL, NULL);
+				send(ClientSocket, header.c_str(), header.length(), 0);
+			}
+				break;
+
+			case FD_CLOSE:
+			{
+				MessageBox(NULL, L"close", NULL, NULL);
+				
+				closesocket(ClientSocket);
+				InitSocket(hWnd);
+
+			}
+				break;
+
+			case FD_ACCEPT:
+			{
+				int size = sizeof(sockaddr);
+				ClientSocket = accept(ListenSocket, NULL, NULL);
+				if (ClientSocket == INVALID_SOCKET)
+				{
+					int nret = WSAGetLastError();
+					WSACleanup();
+				}
+				int iResult;
+				iResult = WSAAsyncSelect(ClientSocket,
+					hWnd,
+					WM_SOCKET,
+					(FD_READ | FD_WRITE | FD_CLOSE));
+				if (iResult == SOCKET_ERROR) {
+					closesocket(ClientSocket);
+					WSACleanup();
+					MessageBox(NULL, L"client socket fail", NULL, NULL);
+
+				}
+				//send(ClientSocket, "a", 1, 0);
+
+				closesocket(ListenSocket);
+			}
+			break;
 		}
 	}
 	default:
@@ -363,6 +429,18 @@ VOID CALLBACK InitSocket(HWND hWnd)
 
 	}
 
+	iResult = WSAAsyncSelect(ListenSocket,
+		hWnd,
+		WM_SOCKET,
+		(FD_CLOSE | FD_ACCEPT));
+	if (iResult == SOCKET_ERROR) {
+		printf("listen failed with error: %d\n", WSAGetLastError());
+		closesocket(ListenSocket);
+		WSACleanup();
+		MessageBox(NULL, L"fail", NULL, NULL);
+
+	}
+
 	// Setup the TCP listening socket
 	iResult = bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen);
 	if (iResult == SOCKET_ERROR) {
@@ -384,6 +462,7 @@ VOID CALLBACK InitSocket(HWND hWnd)
 	}
 
 	// Accept a client socket
+	/*
 	ClientSocket = accept(ListenSocket, NULL, NULL);
 	if (ClientSocket == INVALID_SOCKET) {
 		printf("accept failed with error: %d\n", WSAGetLastError());
@@ -391,15 +470,12 @@ VOID CALLBACK InitSocket(HWND hWnd)
 		WSACleanup();
 
 	}
-
+	*/
 	// No longer need server socket
+	/*
 	RECT rect;
 	closesocket(ListenSocket);
 	GetClientRect(hWnd, &rect);
 	InvalidateRect(hWnd, &rect, TRUE);
-
-	WSAAsyncSelect(ClientSocket,
-		hWnd,
-		WM_SOCKET,
-		(FD_CLOSE | FD_ACCEPT | FD_READ));
+	*/
 }
