@@ -39,6 +39,7 @@ SOCKET ClientSocket = INVALID_SOCKET;
 SOCKET ListenSocket = INVALID_SOCKET;
 int readResult = 0;
 std::string serverHash;
+BOOL isSocketConnected = FALSE;
 
 std::string key;
 std::string hashstring;
@@ -65,16 +66,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 		return FALSE;
 	}
 
-	int port = 2;
-	char portName[12];
-	do {
-		sprintf_s(portName, "\\\\.\\COM%d", port);
-		SP = new Serial(portName);
-		if (port < 50)
-			port++;
-		else
-			port = 1;
-	} while (!(SP->IsConnected()));
+
 
 	
 	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_ENTRYARDUINO));
@@ -148,8 +140,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	dwStyle,
 	CW_USEDEFAULT,
 	CW_USEDEFAULT,
-	500,
 	300,
+	200,
 	NULL,
 	NULL,
 	hInstance,
@@ -164,6 +156,20 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	ShowWindow(hWnd, nCmdShow);
 	hdc = BeginPaint(hWnd, &ps);
 
+	int port = 2;
+	char portName[12];
+	do {
+		sprintf_s(portName, "\\\\.\\COM%d", port);
+		SP = new Serial(portName);
+		if (port < 50)
+			port++;
+		else
+			port = 1;
+	} while (!(SP->IsConnected()));
+
+	RECT rect;
+	GetClientRect(hWnd, &rect);
+	InvalidateRect(hWnd, &rect, TRUE);
 
 	InitSocket(hWnd);
 
@@ -211,11 +217,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_PAINT:
 		hdc = BeginPaint(hWnd, &ps);
 		// TODO: Add any drawing code here...
-		TextOut(hdc,
+		if (isSocketConnected)
+			TextOut(hdc,
+				40, 50,
+				L"Entry connected", _tcslen(L"Entry connected"));
+		else
+			TextOut(hdc,
 			40, 50,
-			L"connected", _tcslen(L"connected"));
+			L"Entry disconnected", _tcslen(L"Entry disconnected"));
+		TextOut(hdc,
+			40, 80,
+			L"arduino connected", _tcslen(L"Arduino connected"));
 		EndPaint(hWnd, &ps);
-		RECT rect;
 		break;
 	case WM_DESTROY:
 		// shutdown the connection since we're done
@@ -297,8 +310,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			case FD_CLOSE:
 			{
 				closesocket(ClientSocket);
+				isSocketConnected = FALSE;
 				InitSocket(hWnd);
-
 			}
 				break;
 
@@ -325,6 +338,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				//send(ClientSocket, "a", 1, 0);
 
 				closesocket(ListenSocket);
+
+				isSocketConnected = TRUE;
+				RECT rect;
+				GetClientRect(hWnd, &rect);
+				InvalidateRect(hWnd, &rect, TRUE);
 			}
 			break;
 		}
@@ -446,21 +464,9 @@ VOID CALLBACK InitSocket(HWND hWnd)
 
 	}
 
-	// Accept a client socket
-	/*
-	ClientSocket = accept(ListenSocket, NULL, NULL);
-	if (ClientSocket == INVALID_SOCKET) {
-		printf("accept failed with error: %d\n", WSAGetLastError());
-		closesocket(ListenSocket);
-		WSACleanup();
 
-	}
-	*/
-	// No longer need server socket
-	/*
 	RECT rect;
-	closesocket(ListenSocket);
 	GetClientRect(hWnd, &rect);
 	InvalidateRect(hWnd, &rect, TRUE);
-	*/
+
 }
