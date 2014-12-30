@@ -53,6 +53,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <AdditionalIncludeDirectories>C:\boost_1_57_0</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -83,7 +84,6 @@
   <ItemGroup>
     <ClInclude Include="base64.h" />
     <ClInclude Include="EntryArduino.h" />
-    <ClInclude Include="handshake.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="sckt.h" />
     <ClInclude Include="Serial.h" />
@@ -92,11 +92,8 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="base64.cpp" />
     <ClCompile Include="EntryArduino.cpp" />
-    <ClCompile Include="handshake.cpp" />
     <ClCompile Include="Serial.cpp" />
-    <ClCompile Include="sha1.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>

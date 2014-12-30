@@ -2,15 +2,15 @@
 //
 
 #include "stdafx.h"
-#include "handshake.h"
 #include "EntryArduino.h"
 #include "Serial.h"
 #include <atlstr.h>
 #include "sckt.h"
 #include <regex>
 #include <string.h>
-#include "base64.h"
 #include "sha1.h"
+
+using namespace cryptlite;
 
 #define MAX_LOADSTRING 100
 #define BUFFER_SIZE 10000
@@ -35,14 +35,13 @@ INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
 VOID CALLBACK ReadSerial();
 VOID CALLBACK InitSocket(HWND hWnd);
 Serial* SP = NULL;
-handshake* hs = NULL;
-
 SOCKET ClientSocket = INVALID_SOCKET;
 SOCKET ListenSocket = INVALID_SOCKET;
 int readResult = 0;
 std::string serverHash;
 
-
+std::string key;
+std::string hashstring;
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
                      _In_ LPTSTR    lpCmdLine,
@@ -165,7 +164,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	ShowWindow(hWnd, nCmdShow);
 	hdc = BeginPaint(hWnd, &ps);
 
-	hs = new handshake();
 
 	InitSocket(hWnd);
 
@@ -267,27 +265,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 						std::string clientHash;
 						clientHash = pch;
-						clientHash = clientHash.substr(18, clientHash.length() - 18);
-						serverHash = clientHash + SERVER_HASH_KEY;
-
-						SHA1 sha;
-						sha.Input(serverHash.data(), serverHash.size());
-						unsigned char digest[20];
-						sha.Result((unsigned*)digest);
-						for (int i = 0; i<20; i += 4) {
-							unsigned char c;
-
-							c = digest[i];
-							digest[i] = digest[i + 3];
-							digest[i + 3] = c;
-
-							c = digest[i + 1];
-							digest[i + 1] = digest[i + 2];
-							digest[i + 2] = c;
-						}
-
-						serverHash = base64_encode((const unsigned char *)digest, 20);
-
+						clientHash = clientHash.substr(19, clientHash.length() - 20) + SERVER_HASH_KEY;
+						clientHash = clientHash.c_str();
+						serverHash = sha1::hash_base64(clientHash.data());
+						break;
 					}
 					pch = strtok_s(NULL, "\n", &context);
 				}
@@ -299,18 +280,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 			case FD_WRITE:
 			{
-				std::string header;
-				header = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection : Upgrade\r\nSec-WebSocket-Accept : " + serverHash + "\r\nSec-WebSocket-Protocol : chat\r\n\r\n";
+				if (serverHash.size()) {
+					std::string header;
+					header = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept : " + serverHash + "\r\n\r\n";
 
-				MessageBox(NULL, CA2W(header.c_str()), NULL, NULL);
-				send(ClientSocket, header.c_str(), header.length(), 0);
+					serverHash = "";
+					send(ClientSocket, header.c_str(), header.length(), 0);
+				}
+				else {
+
+				}
+				
 			}
 				break;
 
 			case FD_CLOSE:
 			{
-				MessageBox(NULL, L"close", NULL, NULL);
-				
 				closesocket(ClientSocket);
 				InitSocket(hWnd);
 
