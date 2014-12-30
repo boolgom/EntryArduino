@@ -259,33 +259,36 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					(char*)szIncoming,
 					sizeof(szIncoming) / sizeof(szIncoming[0]),
 					0);
-				iResult = recv(ClientSocket, szIncoming, inDataLength, 0);
 				
-				char * pch;
-				char * context;
-				pch = strtok_s(szIncoming, "\n", &context);
-				char hashHeader[20] = "Sec-WebSocket-Key: ";
-				/*
-				iResult = hs->parseHandshake(szIncoming, strlen(pch));
-				if (iResult != OPENING_FRAME)
-					MessageBox(NULL, L"fail", NULL, NULL);
-				serverHash = hs->answerHandshake();
-				*/
-				while (pch != NULL)
+
+				if (strncmp(szIncoming, "GET", 3) == 0)
 				{
-					if (strncmp(pch, hashHeader, 18) == 0) {
+					char * pch;
+					char * context;
+					pch = strtok_s(szIncoming, "\n", &context);
+					char hashHeader[20] = "Sec-WebSocket-Key: ";
+					while (pch != NULL)
+					{
+						if (strncmp(pch, hashHeader, 18) == 0) {
 
 
-						std::string clientHash;
-						clientHash = pch;
-						clientHash = clientHash.substr(19, clientHash.length() - 20) + SERVER_HASH_KEY;
-						clientHash = clientHash.c_str();
-						serverHash = sha1::hash_base64(clientHash.data());
-						break;
+							std::string clientHash;
+							clientHash = pch;
+							clientHash = clientHash.substr(19, clientHash.length() - 20) + SERVER_HASH_KEY;
+							clientHash = clientHash.c_str();
+							serverHash = sha1::hash_base64(clientHash.data());
+							break;
+						}
+						pch = strtok_s(NULL, "\n", &context);
 					}
-					pch = strtok_s(NULL, "\n", &context);
+					if (serverHash.size())
+						PostMessage(hWnd, WM_SOCKET, wParam, FD_WRITE);
 				}
-				PostMessage(hWnd, WM_SOCKET, wParam, FD_WRITE);
+				else
+				{
+					MessageBox(NULL, CA2W(szIncoming), NULL, NULL);
+					//PostMessage(hWnd, WM_SOCKET, wParam, FD_WRITE);
+				}
 			}
 
 				break;
@@ -301,7 +304,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					send(ClientSocket, header.c_str(), header.length(), 0);
 				}
 				else {
-
+					//send(ClientSocket, "a\r\n\r\n", strlen("a\r\n\r\n"), 0);
 				}
 				
 			}
