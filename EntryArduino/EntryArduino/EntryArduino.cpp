@@ -34,15 +34,19 @@ LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
 VOID CALLBACK ReadSerial();
 VOID CALLBACK InitSocket(HWND hWnd);
+int server_send(char* src, SOCKET s, bool isWebSocket);
+int server_recv(char* buffer, SOCKET s, bool isWebSocket);
+
 Serial* SP = NULL;
 SOCKET ClientSocket = INVALID_SOCKET;
 SOCKET ListenSocket = INVALID_SOCKET;
 int readResult = 0;
 std::string serverHash;
 BOOL isSocketConnected = FALSE;
+BOOL isSocketEstablished = FALSE;
 
 std::string key;
-std::string hashstring;
+std::string sendData;
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
                      _In_ LPTSTR    lpCmdLine,
@@ -254,11 +258,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			{
 				char szIncoming[1024];
 				ZeroMemory(szIncoming, sizeof(szIncoming));
-
-				int inDataLength = recv(ClientSocket,
+				int inDataLength;
+				inDataLength = recv(ClientSocket,
 					(char*)szIncoming,
 					sizeof(szIncoming) / sizeof(szIncoming[0]),
 					0);
+				
 				
 
 				if (strncmp(szIncoming, "GET", 3) == 0)
@@ -270,8 +275,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					while (pch != NULL)
 					{
 						if (strncmp(pch, hashHeader, 18) == 0) {
-
-
 							std::string clientHash;
 							clientHash = pch;
 							clientHash = clientHash.substr(19, clientHash.length() - 20) + SERVER_HASH_KEY;
@@ -281,12 +284,43 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						}
 						pch = strtok_s(NULL, "\n", &context);
 					}
-					if (serverHash.size())
+					if (serverHash.size()) {
 						PostMessage(hWnd, WM_SOCKET, wParam, FD_WRITE);
+					}
 				}
-				else
+				else if (isSocketEstablished)
 				{
-					MessageBox(NULL, CA2W(szIncoming), NULL, NULL);
+					bool isMask = szIncoming[1] >> 7;
+					int payloadLength = szIncoming[1] & 0x7F;
+					std::string sendData = "";
+					char maskingKeys[4];
+					char outputData[1024];
+					ZeroMemory(outputData, sizeof(outputData));
+					if (payloadLength < 126)
+					{
+						if (isMask)
+						{
+							maskingKeys[0] = szIncoming[2];
+							maskingKeys[1] = szIncoming[3];
+							maskingKeys[2] = szIncoming[4];
+							maskingKeys[3] = szIncoming[5];
+						}
+						for (int i = 0; i < payloadLength; ++i) {
+							outputData[i] = szIncoming[i + 6] ^ maskingKeys[i % 4];
+						}
+
+					}
+					char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+
+					for (int i = 0; i < payloadLength; ++i)
+					{
+						char const byte = outputData[i];
+
+						sendData += hex_chars[(byte & 0xF0) >> 4];
+						sendData += hex_chars[(byte & 0x0F) >> 0];
+					}
+
+					MessageBox(NULL, CA2W(sendData.c_str()), NULL, NULL);
 					//PostMessage(hWnd, WM_SOCKET, wParam, FD_WRITE);
 				}
 			}
@@ -302,8 +336,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 					serverHash = "";
 					send(ClientSocket, header.c_str(), header.length(), 0);
+					isSocketEstablished = TRUE;
 				}
-				else {
+				else if (isSocketEstablished) {
 					//send(ClientSocket, "a\r\n\r\n", strlen("a\r\n\r\n"), 0);
 				}
 				
@@ -314,6 +349,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			{
 				closesocket(ClientSocket);
 				isSocketConnected = FALSE;
+
+				isSocketEstablished = FALSE;
 				InitSocket(hWnd);
 			}
 				break;
@@ -472,4 +509,42 @@ VOID CALLBACK InitSocket(HWND hWnd)
 	GetClientRect(hWnd, &rect);
 	InvalidateRect(hWnd, &rect, TRUE);
 
+}
+
+int server_send(char* src, SOCKET s, bool isWebSocket)
+{
+	if (!isWebSocket) {
+		return send(s, src, strlen(src), 0);
+	}
+	int length = strlen(src)
+		+ 1	//0x00
+		+ 1;	//0xFF
+	char* frame = (char*)calloc(length, sizeof(char));
+	frame[0] = 0x00;
+	for (int i = 0; i < strlen(src); i++)
+	{
+		frame[1 + i] = src[i];//read src into frame
+	}
+	frame[length - 1] = 0xFF;
+	return send(s, frame, length, 0);
+}
+
+int server_recv(char* buffer, SOCKET s, bool isWebSocket)
+{
+
+	memset(buffer, 0x00, BUFSIZ);
+	if (!isWebSocket) {
+		return recv(s, buffer, BUFSIZ, 0);
+	}
+
+	char framed_data[BUFSIZ];
+	int received = recv(s, framed_data, BUFSIZ, 0);
+	char end = 0xFF;
+	for (int i = 1; framed_data[i] != end && i < received; i++)
+	{
+		buffer[i - 1] = framed_data[i];
+	}
+	return received;
+
+	//if handshake fails: return -1.
 }
