@@ -17,7 +17,6 @@ void loop(){
 }
 
 void sendPinValues() {
-  Serial.write('a');
   for (int pinNumber = 0; pinNumber < 6; pinNumber++) {
     sendAnalogValue(pinNumber, analogRead(pinNumber));
   }
@@ -25,7 +24,7 @@ void sendPinValues() {
 
 void sendAnalogValue(int pinNumber, int value) {
   Serial.write(B11000000
-               | ((pinNumber & B111)<<4)
+               | ((pinNumber & B111)<<3)
                | ((value>>7) & B111));
   Serial.write(value & B1111111);
 }

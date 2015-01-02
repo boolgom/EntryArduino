@@ -32,6 +32,7 @@ ATOM				MyRegisterClass(HINSTANCE hInstance);
 BOOL				InitInstance(HINSTANCE, int);
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
+VOID UpdateValue(char * inputData, int dataLength);
 VOID CALLBACK ReadSerial();
 VOID CALLBACK InitSocket(HWND hWnd);
 
@@ -42,6 +43,10 @@ int readResult = 0;
 std::string serverHash;
 BOOL isSocketConnected = FALSE;
 BOOL isSocketEstablished = FALSE;
+
+char remainSerialValue = 0;
+
+int analogValue[6];
 
 char socketInput[1024];
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
@@ -327,7 +332,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			{
 				if (serverHash.size()) {
 					std::string header;
-					header = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept : " + serverHash + "\r\n\r\n";
+					header = "HTTP/1.1 101 Switching Protocols\r\n";
+					header += "Upgrade: websocket\r\n";
+					header += "Connection: Upgrade\r\n";
+					header += "Sec-WebSocket-Accept : " + serverHash + "\r\n\r\n";
 
 					serverHash = "";
 					send(ClientSocket, header.c_str(), header.length(), 0);
@@ -337,12 +345,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					char socketOutput[1024];
 					ZeroMemory(socketOutput, sizeof(socketOutput));
 					socketOutput[0] = 0x81;
-					socketOutput[1] = 0x7F & strlen(socketInput);
-					for (int i = 0; i < strlen(socketInput); ++i)
+					std::string output = "";
+					/*
+					for (int i = 0; i <6; ++i)
 					{
-						socketOutput[2 + i] = socketInput[i];
+						socketOutput[2 + 2 * i] = analogValue[i] >> 8;
+						socketOutput[2 + 2 * i + 1] = analogValue[i] & 0xFF;
 					}
-					send(ClientSocket, socketOutput, strlen(socketOutput), 0);
+					*/
+					for (int i = 0; i < 6; ++i)
+					{
+						char str[30];
+						sprintf_s(str, "%d:%d ", i, analogValue[i]);
+						output += str;
+					}
+					socketOutput[1] = 0x7F & output.size();
+					output = socketOutput + output;
+					send(ClientSocket, output.c_str(), output.size(), 0);
+
 				}
 				
 			}
@@ -425,6 +445,7 @@ VOID CALLBACK ReadSerial()
 
 	if (SP->IsConnected()) {
 		readResult = SP->ReadData(InputData, dataLength);
+		UpdateValue(InputData, readResult);
 	}
 
 
@@ -512,4 +533,43 @@ VOID CALLBACK InitSocket(HWND hWnd)
 	GetClientRect(hWnd, &rect);
 	InvalidateRect(hWnd, &rect, TRUE);
 
+}
+
+// process serial data to value and store to memory
+VOID UpdateValue(char * inputData, int dataLength)
+{
+	for (int i=0; i<dataLength; i++)
+	{
+		char data = inputData[i];
+		
+		if (data >> 7)
+		{
+			remainSerialValue = data;
+		}
+		else
+		{
+			if (remainSerialValue)
+			{
+				BOOL isAnalog = (remainSerialValue >> 6) & 0x01;
+				if (isAnalog)
+				{
+					if (data>>7)
+						MessageBox(NULL, L"ooh exception", NULL, NULL);
+
+					int port = (remainSerialValue >> 3) & 0x07;
+					if (port < 0 || port > 5)
+						MessageBox(NULL, L"port exception", NULL, NULL);
+					analogValue[port] = ((remainSerialValue & 0x07) << 7) +
+						(data & 0x7F);
+					if (analogValue[port] < 0)
+						MessageBox(NULL, L"value exception", NULL, NULL);
+				}
+				else
+				{
+					MessageBox(NULL, L"oh exception", NULL, NULL);
+				}
+				remainSerialValue = 0;
+			}
+		}
+	}
 }
