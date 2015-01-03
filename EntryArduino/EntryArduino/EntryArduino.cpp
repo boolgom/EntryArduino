@@ -342,25 +342,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					isSocketEstablished = TRUE;
 				}
 				else if (isSocketEstablished) {
-					char socketOutput[1024];
-					ZeroMemory(socketOutput, sizeof(socketOutput));
-					socketOutput[0] = 0x81;
+					char socketHeader[10];
+					ZeroMemory(socketHeader, sizeof(socketHeader));
 					std::string output = "";
-					/*
-					for (int i = 0; i <6; ++i)
-					{
-						socketOutput[2 + 2 * i] = analogValue[i] >> 8;
-						socketOutput[2 + 2 * i + 1] = analogValue[i] & 0xFF;
-					}
-					*/
 					for (int i = 0; i < 6; ++i)
 					{
 						char str[30];
 						sprintf_s(str, "%d:%d ", i, analogValue[i]);
 						output += str;
 					}
-					socketOutput[1] = 0x7F & output.size();
-					output = socketOutput + output;
+					socketHeader[0] = 0x81;
+					socketHeader[1] = 0x7F & output.size();
+					output = socketHeader + output;
 					send(ClientSocket, output.c_str(), output.size(), 0);
 
 				}
@@ -557,10 +550,13 @@ VOID UpdateValue(char * inputData, int dataLength)
 						MessageBox(NULL, L"ooh exception", NULL, NULL);
 
 					int port = (remainSerialValue >> 3) & 0x07;
+
 					if (port < 0 || port > 5)
 						MessageBox(NULL, L"port exception", NULL, NULL);
+
 					analogValue[port] = ((remainSerialValue & 0x07) << 7) +
 						(data & 0x7F);
+
 					if (analogValue[port] < 0)
 						MessageBox(NULL, L"value exception", NULL, NULL);
 				}
