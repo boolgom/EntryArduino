@@ -354,8 +354,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						sprintf_s(str, "\"a%d\":%d,", i, analogValue[i]);
 						output += str;
 					}
-					output += "}";
 					output = output.substr(0, output.size()-1);
+					output += "}";
 					socketHeader[0] = 0x81;
 					socketHeader[1] = 0x7F & output.size();
 					output = socketHeader + output;
