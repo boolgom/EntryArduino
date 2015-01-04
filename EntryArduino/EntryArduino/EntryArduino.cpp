@@ -311,6 +311,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 					}
 					
+					/*
+					// hex representation
 					std::string sendData = "";
 					char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
 
@@ -321,6 +323,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						sendData += hex_chars[(byte & 0xF0) >> 4];
 						sendData += hex_chars[(byte & 0x0F) >> 0];
 					}
+					*/
 					PostMessage(hWnd, WM_SOCKET, wParam, FD_WRITE);
 				}
 			}
@@ -344,13 +347,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				else if (isSocketEstablished) {
 					char socketHeader[10];
 					ZeroMemory(socketHeader, sizeof(socketHeader));
-					std::string output = "";
+					std::string output = "{";
 					for (int i = 0; i < 6; ++i)
 					{
 						char str[30];
-						sprintf_s(str, "%d:%d ", i, analogValue[i]);
+						sprintf_s(str, "\"a%d\":%d,", i, analogValue[i]);
 						output += str;
 					}
+					output += "}";
+					output = output.substr(0, output.size()-1);
 					socketHeader[0] = 0x81;
 					socketHeader[1] = 0x7F & output.size();
 					output = socketHeader + output;
@@ -442,7 +447,7 @@ VOID CALLBACK ReadSerial()
 	}
 
 
-}
+} 
 
 VOID CALLBACK InitSocket(HWND hWnd)
 {
