@@ -15,7 +15,7 @@ using namespace cryptlite;
 #define MAX_LOADSTRING 100
 #define BUFFER_SIZE 10000
 #define DEFAULT_PORT "23518"
-#define SERIAL_INTERVAL 20
+#define SERIAL_INTERVAL 15
 #define WM_SOCKET		104
 #define SERVER_HASH_KEY "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 char szHistory[10000];
@@ -311,6 +311,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 					}
 					
+					if (SP->IsConnected())
+					{
+						SP->WriteData(socketInput, payloadLength);
+					}
+					
 					/*
 					// hex representation
 					std::string sendData = "";
@@ -323,6 +328,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						sendData += hex_chars[(byte & 0xF0) >> 4];
 						sendData += hex_chars[(byte & 0x0F) >> 0];
 					}
+					MessageBox(NULL, CA2W(sendData.c_str()), NULL, NULL);
 					*/
 					PostMessage(hWnd, WM_SOCKET, wParam, FD_WRITE);
 				}

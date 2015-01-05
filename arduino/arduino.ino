@@ -1,6 +1,6 @@
 
 int analogPin = 3;   // potentiometer connected to analog pin 3
-
+int incomingByte = 0;   // for incoming serial data
 int val = 0;         // variable to store the read value
 
 
@@ -12,6 +12,13 @@ void setup(){
 }
 
 void loop(){
+  while (Serial.available()) {
+    delay(5); //delay to allow buffer to fill
+    if (Serial.available() >0) {
+      char c = Serial.read(); //gets one byte from serial buffer
+      updateDigitalPort(c);
+    }
+  }
    sendPinValues();
    delay(20);
 }
@@ -34,4 +41,24 @@ void initPorts () {
     pinMode(pinNumber, OUTPUT);
     digitalWrite(pinNumber, 0);
   }
-}                                      
+}
+
+void updateDigitalPort (char c) {
+  // first data
+  if (c>>7) {
+    // digital
+    if ((c>>6) & 1) {
+      // is data end at this chunk
+      if ((c>>5) & 1) {
+        int port = (c >> 1) & B1111;
+        if (c & 1)
+          digitalWrite(port, HIGH);
+        else
+          digitalWrite(port, LOW);
+      }
+      else {
+        
+      }
+    }
+  }
+}
