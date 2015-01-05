@@ -34,4 +34,4 @@ void initPorts () {
     pinMode(pinNumber, OUTPUT);
     digitalWrite(pinNumber, 0);
   }
-}
+}                                      
