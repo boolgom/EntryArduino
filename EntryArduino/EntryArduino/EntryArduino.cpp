@@ -157,7 +157,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	if (!hWnd)
 		return FALSE;
 
-	SetTimer(hWnd, 0, SERIAL_INTERVAL, (TIMERPROC)ReadSerial);
+	//SetTimer(hWnd, 0, SERIAL_INTERVAL, (TIMERPROC)ReadSerial);
 		
 	ShowWindow(hWnd, nCmdShow);
 	hdc = BeginPaint(hWnd, &ps);
@@ -292,10 +292,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				}
 				else if (isSocketEstablished)
 				{
+					int opcode = szIncoming[0] & 0x0F;
 					bool isMask = szIncoming[1] >> 7;
 					int payloadLength = szIncoming[1] & 0x7F;
 					char maskingKeys[4];
 					ZeroMemory(socketInput, sizeof(socketInput));
+					if (opcode == 8) {
+						closesocket(ClientSocket);
+						isSocketConnected = FALSE;
+
+						isSocketEstablished = FALSE;
+						InitSocket(hWnd);
+						break;
+					}
 					if (payloadLength < 126)
 					{
 						if (isMask)
@@ -315,15 +324,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					{
 						SP->WriteData(socketInput, payloadLength);
 					}
-					
+					ReadSerial();
 					/*
 					// hex representation
 					std::string sendData = "";
 					char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
 
-					for (int i = 0; i < payloadLength; ++i)
+					for (int i = 0; i < strlen(szIncoming); ++i)
 					{
-						char const byte = socketInput[i];
+						char const byte = szIncoming[i];
 
 						sendData += hex_chars[(byte & 0xF0) >> 4];
 						sendData += hex_chars[(byte & 0x0F) >> 0];
