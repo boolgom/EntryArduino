@@ -60,10 +60,13 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="small.ico">
+    <Image Include="EntryArduino.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="EntryArduino.ico">
+    <Image Include="..\..\..\Entry\public\img\icons\entry.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="arduino.bmp">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

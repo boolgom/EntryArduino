@@ -103,8 +103,9 @@
     <ResourceCompile Include="EntryArduino.rc" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="..\..\..\Entry\public\img\icons\entry.ico" />
+    <Image Include="arduino.bmp" />
     <Image Include="EntryArduino.ico" />
-    <Image Include="small.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

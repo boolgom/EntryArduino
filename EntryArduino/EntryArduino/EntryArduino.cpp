@@ -24,7 +24,6 @@ char szHistory[10000];
 HINSTANCE hInst;								// current instance
 TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
-
 char InputData[BUFFER_SIZE];
 
 // Forward declarations of functions included in this code module:
@@ -35,6 +34,7 @@ INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
 VOID UpdateValue(char * inputData, int dataLength);
 VOID CALLBACK ReadSerial();
 VOID CALLBACK InitSocket(HWND hWnd);
+BOOL CALLBACK connectSerial();
 
 Serial* SP = NULL;
 SOCKET ClientSocket = INVALID_SOCKET;
@@ -137,7 +137,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	DWORD       dwStyle;
 	HDC hdc;
 	PAINTSTRUCT ps;
-	dwStyle = (WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
+	dwStyle = (WS_OVERLAPPED | WS_MINIMIZEBOX | WS_SYSMENU);
 	
 	hInst = hInstance; // Store instance handle in our global variable
 	
@@ -147,8 +147,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	dwStyle,
 	CW_USEDEFAULT,
 	CW_USEDEFAULT,
-	300,
-	200,
+	260,
+	150,
 	NULL,
 	NULL,
 	hInstance,
@@ -161,16 +161,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	ShowWindow(hWnd, nCmdShow);
 	hdc = BeginPaint(hWnd, &ps);
 
-	int port = 2;
-	char portName[12];
-	do {
-		sprintf_s(portName, "\\\\.\\COM%d", port);
-		SP = new Serial(portName);
-		if (port < 50)
-			port++;
-		else
-			port = 1;
-	} while (!(SP->IsConnected()));
+	if (!connectSerial())
+		return FALSE;
+
 
 	RECT rect;
 	GetClientRect(hWnd, &rect);
@@ -222,6 +215,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_PAINT:
 		hdc = BeginPaint(hWnd, &ps);
 		// TODO: Add any drawing code here...
+		/*
 		if (isSocketConnected)
 			TextOut(hdc,
 				40, 50,
@@ -230,9 +224,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			TextOut(hdc,
 			40, 50,
 			L"Entry disconnected", _tcslen(L"Entry disconnected"));
+			*/
 		TextOut(hdc,
-			40, 80,
-			L"arduino connected", _tcslen(L"Arduino connected"));
+			24, 40,
+			L"아두이노가 연결되었습니다.", _tcslen(L"아두이노가 연결되었습니다."));
 		EndPaint(hWnd, &ps);
 		break;
 	case WM_DESTROY:
@@ -319,21 +314,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 					}
 
-					/*
-					// hex representation
-					std::string sendData = "";
-					char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
-
-					for (int i = 0; i < strlen(szIncoming); ++i)
-					{
-						char const byte = szIncoming[i];
-
-						sendData += hex_chars[(byte & 0xF0) >> 4];
-						sendData += hex_chars[(byte & 0x0F) >> 0];
-					}
-					MessageBox(NULL, CA2W(sendData.c_str()), NULL, NULL);
-					*/
-
 					if (SP->IsConnected())
 					{
 						SP->WriteData(socketInput, payloadLength);
@@ -410,7 +390,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				if (iResult == SOCKET_ERROR) {
 					closesocket(ClientSocket);
 					WSACleanup();
-					MessageBox(NULL, L"client socket fail", NULL, NULL);
 
 				}
 				//send(ClientSocket, "a", 1, 0);
@@ -457,6 +436,8 @@ VOID CALLBACK ReadSerial()
 	char incomingData[BUFFER_SIZE] = "";
 
 	int dataLength = BUFFER_SIZE;
+
+	ZeroMemory(InputData, sizeof(InputData));
 
 	if (SP->IsConnected()) {
 		readResult = SP->ReadData(InputData, dataLength);
@@ -568,26 +549,38 @@ VOID UpdateValue(char * inputData, int dataLength)
 				BOOL isAnalog = (remainSerialValue >> 6) & 0x01;
 				if (isAnalog)
 				{
-					if (data>>7)
-						MessageBox(NULL, L"ooh exception", NULL, NULL);
-
 					int port = (remainSerialValue >> 3) & 0x07;
-
-					if (port < 0 || port > 5)
-						MessageBox(NULL, L"port exception", NULL, NULL);
-
 					analogValue[port] = ((remainSerialValue & 0x07) << 7) +
 						(data & 0x7F);
-
-					if (analogValue[port] < 0)
-						MessageBox(NULL, L"value exception", NULL, NULL);
 				}
 				else
 				{
-					MessageBox(NULL, L"oh exception", NULL, NULL);
 				}
 				remainSerialValue = 0;
 			}
 		}
 	}
+}
+
+BOOL CALLBACK connectSerial() {
+	char portName[12];
+	BOOL isConnected = FALSE;
+	for (int port = 1; port < 50; port++) {
+		sprintf_s(portName, "\\\\.\\COM%d", port);
+		SP = new Serial(portName);
+		if (SP->IsConnected())
+		{
+			int dataLength = BUFFER_SIZE;
+			ZeroMemory(InputData, sizeof(InputData));
+			SP->ReadData(InputData, dataLength);
+			BOOL first, second;
+			first = InputData[0] >> 7;
+			second = InputData[1] >> 7;
+			if ((first || second) && !(first && second))
+				return TRUE;
+		}
+
+	}
+	MessageBox(NULL, L"아두이노가 올바르게 연결되지 않았습니다.", NULL, NULL);
+	return FALSE;
 }
