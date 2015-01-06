@@ -13,7 +13,7 @@ void setup(){
 
 void loop(){
   while (Serial.available()) {
-    delay(5); //delay to allow buffer to fill
+    //delay(5); //delay to allow buffer to fill
     if (Serial.available() >0) {
       char c = Serial.read(); //gets one byte from serial buffer
       updateDigitalPort(c);

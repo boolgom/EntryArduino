@@ -49,6 +49,7 @@ char remainSerialValue = 0;
 int analogValue[6];
 
 char socketInput[1024];
+int payloadLength;
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
                      _In_ LPTSTR    lpCmdLine,
@@ -156,8 +157,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	
 	if (!hWnd)
 		return FALSE;
-
-	//SetTimer(hWnd, 0, SERIAL_INTERVAL, (TIMERPROC)ReadSerial);
 		
 	ShowWindow(hWnd, nCmdShow);
 	hdc = BeginPaint(hWnd, &ps);
@@ -294,7 +293,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				{
 					int opcode = szIncoming[0] & 0x0F;
 					bool isMask = szIncoming[1] >> 7;
-					int payloadLength = szIncoming[1] & 0x7F;
+					payloadLength = szIncoming[1] & 0x7F;
 					char maskingKeys[4];
 					ZeroMemory(socketInput, sizeof(socketInput));
 					if (opcode == 8) {
@@ -319,12 +318,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						}
 
 					}
-					
-					if (SP->IsConnected())
-					{
-						SP->WriteData(socketInput, payloadLength);
-					}
-					ReadSerial();
+
 					/*
 					// hex representation
 					std::string sendData = "";
@@ -339,6 +333,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					}
 					MessageBox(NULL, CA2W(sendData.c_str()), NULL, NULL);
 					*/
+
+					if (SP->IsConnected())
+					{
+						SP->WriteData(socketInput, payloadLength);
+					}
+					ReadSerial();
 					PostMessage(hWnd, WM_SOCKET, wParam, FD_WRITE);
 				}
 			}
@@ -375,7 +375,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					socketHeader[1] = 0x7F & output.size();
 					output = socketHeader + output;
 					send(ClientSocket, output.c_str(), output.size(), 0);
+					
 
+					
 				}
 				
 			}
