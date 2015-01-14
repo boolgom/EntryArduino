@@ -207,6 +207,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			break;
 		case IDM_EXIT:
 			DestroyWindow(hWnd);
+			SP->disconnect();
 			break;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
@@ -233,19 +234,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_DESTROY:
 		// shutdown the connection since we're done
 		int iResult;
-		iResult = shutdown(ClientSocket, SD_SEND);
-		if (iResult == SOCKET_ERROR) {
-			printf("shutdown failed with error: %d\n", WSAGetLastError());
-			closesocket(ClientSocket);
-			WSACleanup();
-			return 1;
-		}
 
 		// socket cleanup
 		closesocket(ClientSocket);
+		SP->disconnect();
 		WSACleanup();
 		PostQuitMessage(0);
-		break;
+		return 0;
 	case WM_SOCKET:
 	{
 		switch (WSAGETSELECTEVENT(lParam))

@@ -36,6 +36,7 @@ public:
 	bool WriteData(char *buffer, unsigned int nbChar);
 	//Check if we are actually connected
 	bool IsConnected();
+	void disconnect();
 
 
 };

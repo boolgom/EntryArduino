@@ -139,3 +139,14 @@ bool Serial::IsConnected()
 	//Simply return the connection status
 	return this->connected;
 }
+
+void Serial::disconnect()
+{
+	if (this->connected)
+	{
+		//We're no longer connected
+		this->connected = false;
+		//Close the serial handler
+		CloseHandle(this->hSerial);
+	}
+}
