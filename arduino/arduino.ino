@@ -1,9 +1,4 @@
-
-int analogPin = 3;   // potentiometer connected to analog pin 3
-int incomingByte = 0;   // for incoming serial data
-int val = 0;         // variable to store the read value
-
-
+char remainData;
 
 void setup(){
   Serial.begin(38400);
@@ -46,7 +41,7 @@ void initPorts () {
 void updateDigitalPort (char c) {
   // first data
   if (c>>7) {
-    // digital
+    // is output
     if ((c>>6) & 1) {
       // is data end at this chunk
       if ((c>>5) & 1) {
@@ -57,8 +52,13 @@ void updateDigitalPort (char c) {
           digitalWrite(port, LOW);
       }
       else {
-        
+        remainData = c;
       }
     }
+  } else {
+    int port = (remainData >> 1) & B1111;
+    int value = ((remainData & 1) << 7) + (c & B1111111);
+    analogWrite(port, value);
+    remainData = 0;
   }
 }

@@ -207,7 +207,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			break;
 		case IDM_EXIT:
 			DestroyWindow(hWnd);
-			SP->disconnect();
+			//SP->disconnect();
 			break;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
