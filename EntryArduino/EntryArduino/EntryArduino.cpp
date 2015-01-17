@@ -47,6 +47,7 @@ BOOL isSocketEstablished = FALSE;
 char remainSerialValue = 0;
 
 int analogValue[6];
+int digitalValue[14];
 
 char socketInput[1024];
 int payloadLength;
@@ -337,7 +338,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				else if (isSocketEstablished) {
 					char socketHeader[10];
 					ZeroMemory(socketHeader, sizeof(socketHeader));
-					std::string output = "{";
+					std::string output = "{\"d\":\"";
+					for (int i = 0; i < 14; ++i)
+					{
+						if (digitalValue[i]>0)
+							output += "1";
+						else
+							output += "0";
+					}
+					output += "\",";
 					for (int i = 0; i < 6; ++i)
 					{
 						char str[30];
@@ -346,13 +355,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					}
 					output = output.substr(0, output.size()-1);
 					output += "}";
+
 					socketHeader[0] = 0x81;
 					socketHeader[1] = 0x7F & output.size();
 					output = socketHeader + output;
-					send(ClientSocket, output.c_str(), output.size(), 0);
-					
-
-					
+					send(ClientSocket, output.data(), output.size(), 0);
 				}
 				
 			}
@@ -387,7 +394,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					WSACleanup();
 
 				}
-				//send(ClientSocket, "a", 1, 0);
 
 				closesocket(ListenSocket);
 
@@ -535,7 +541,14 @@ VOID UpdateValue(char * inputData, int dataLength)
 		
 		if (data >> 7)
 		{
-			remainSerialValue = data;
+			if (!((data >> 6) & 0x01)) {
+				int port = (data >> 2) & 0x0f;
+				digitalValue[port] = data & 0x01;
+				remainSerialValue = 0;
+			}
+			else {
+				remainSerialValue = data;
+			}
 		}
 		else
 		{
@@ -560,6 +573,10 @@ VOID UpdateValue(char * inputData, int dataLength)
 BOOL CALLBACK connectSerial() {
 	char portName[12];
 	BOOL isConnected = FALSE;
+	for (int i = 0; i < 14; ++i)
+	{
+		digitalValue[i] = 0;
+	}
 	for (int port = 1; port < 50; port++) {
 		sprintf_s(portName, "\\\\.\\COM%d", port);
 		SP = new Serial(portName);
