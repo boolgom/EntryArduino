@@ -150,7 +150,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	dwStyle,
 	CW_USEDEFAULT,
 	CW_USEDEFAULT,
-	260,
+	300,
 	150,
 	NULL,
 	NULL,
@@ -168,7 +168,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	GetClientRect(hWnd, &rect);
 	InvalidateRect(hWnd, &rect, TRUE);
 
-	connectSerial(hWnd);
+	PostMessage(hWnd, WM_SERIAL, NULL, FD_CLOSE);
 	InitSocket(hWnd);
 
 	return TRUE;
@@ -226,9 +226,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			40, 50,
 			L"Entry disconnected", _tcslen(L"Entry disconnected"));
 			*/
-		TextOut(hdc,
+		if (SP && SP->IsConnected())
+			TextOut(hdc,
+				24, 40,
+				L"아두이노가 연결되었습니다.", _tcslen(L"아두이노가 연결되었습니다."));
+		else
+			TextOut(hdc,
 			24, 40,
-			L"아두이노가 연결되었습니다.", _tcslen(L"아두이노가 연결되었습니다."));
+			L"아두이노가 연결되지 않았습니다.", _tcslen(L"아두이노가 연결되지 않았습니다."));
 		EndPaint(hWnd, &ps);
 		break;
 	case WM_DESTROY:
@@ -310,10 +315,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 					}
 					SendMessage(hWnd, WM_SERIAL, wParam, FD_READ);
-					
-
-					
-					PostMessage(hWnd, WM_SOCKET, wParam, FD_WRITE);
+					SendMessage(hWnd, WM_SOCKET, wParam, FD_WRITE);
 				}
 			}
 
@@ -396,9 +398,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				closesocket(ListenSocket);
 
 				isSocketConnected = TRUE;
-				RECT rect;
-				GetClientRect(hWnd, &rect);
-				InvalidateRect(hWnd, &rect, TRUE);
 			}
 			break;
 		}
@@ -406,46 +405,55 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	}
 	case WM_SERIAL:
 	{
-					  switch (WSAGETSELECTEVENT(lParam)) {
-						case FD_READ:
-						{
+		switch (WSAGETSELECTEVENT(lParam)) {
+			case FD_READ:
+			{
 							
-							if (SP->IsConnected())
-							{
-								BOOLEAN serialState;
-								SP->WriteData(socketInput, payloadLength);
-								serialState = ReadSerial();
-								if (!serialState)
-									failCount++;
-								else
-									failCount = 0;
-								if (failCount > 10)
-									PostMessage(hWnd, WM_SERIAL, wParam, FD_CLOSE);
-							}
-						}
-							break;
-						case FD_CLOSE:
-						{
-										 failCount = 0;
-							SP->disconnect();
-							connectSerial(hWnd);
+				if (SP->IsConnected())
+				{
+					BOOLEAN serialState;
+					SP->WriteData(socketInput, payloadLength);
+					serialState = ReadSerial();
+					if (!serialState)
+						failCount++;
+					else
+						failCount = 0;
+					if (failCount > 10) {
 
-						}
-							break;
-						case FD_ACCEPT:
-						{
-							PostMessage(hWnd, WM_SERIAL, wParam, FD_READ);
+						RECT rect;
+						GetClientRect(hWnd, &rect);
+						InvalidateRect(hWnd, &rect, TRUE);
 
+						PostMessage(hWnd, WM_SERIAL, wParam, FD_CLOSE);
 
-						}
-							break;
-						case FD_WRITE:
-						{
+					}
+				}
+			}
+				break;
+			case FD_CLOSE:
+			{
+				if (SP)
+					SP->disconnect();
+				SendMessage(hWnd, WM_PAINT, wParam, NULL);
+				connectSerial(hWnd);
+				failCount = 0;
+			}
+				break;
+			case FD_ACCEPT:
+			{
+							  RECT rect;
+							  GetClientRect(hWnd, &rect);
+							  InvalidateRect(hWnd, &rect, TRUE);
+							  SendMessage(hWnd, WM_PAINT, wParam, NULL);
+			}
+				break;
+			case FD_WRITE:
+			{
 
-						}
-							break;
-						}
-						break;
+			}
+				break;
+			}
+		break;
 	}
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
@@ -617,6 +625,8 @@ VOID UpdateValue(char * inputData, int dataLength)
 VOID CALLBACK connectSerial(HWND hWnd) {
 	char portName[12];
 	BOOL isConnected = FALSE;
+	if (SP && SP->IsConnected())
+		return;
 	for (int i = 0; i < 14; ++i)
 	{
 		digitalValue[i] = 0;
