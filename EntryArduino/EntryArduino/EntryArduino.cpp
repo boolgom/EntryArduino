@@ -631,7 +631,7 @@ VOID CALLBACK connectSerial(HWND hWnd) {
 	{
 		digitalValue[i] = 0;
 	}
-	for (int port = 1; port < 50; port++) {
+	for (int port = 1; port < 25; port++) {
 		sprintf_s(portName, "\\\\.\\COM%d", port);
 		SP = new Serial(portName);
 		if (SP->IsConnected())
