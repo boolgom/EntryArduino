@@ -17,6 +17,7 @@ using namespace cryptlite;
 #define DEFAULT_PORT "23518"
 #define SERIAL_INTERVAL 15
 #define WM_SOCKET		104
+#define WM_SERIAL		(WM_USER + 0x0001)
 #define SERVER_HASH_KEY "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 char szHistory[10000];
 
@@ -32,14 +33,15 @@ BOOL				InitInstance(HINSTANCE, int);
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
 VOID UpdateValue(char * inputData, int dataLength);
-VOID CALLBACK ReadSerial();
 VOID CALLBACK InitSocket(HWND hWnd);
-BOOL CALLBACK connectSerial();
+VOID CALLBACK connectSerial(HWND hWnd);
+BOOLEAN CALLBACK ReadSerial();
 
 Serial* SP = NULL;
 SOCKET ClientSocket = INVALID_SOCKET;
 SOCKET ListenSocket = INVALID_SOCKET;
 int readResult = 0;
+int failCount = 0;
 std::string serverHash;
 BOOL isSocketConnected = FALSE;
 BOOL isSocketEstablished = FALSE;
@@ -162,14 +164,11 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	ShowWindow(hWnd, nCmdShow);
 	hdc = BeginPaint(hWnd, &ps);
 
-	if (!connectSerial())
-		return FALSE;
-
-
 	RECT rect;
 	GetClientRect(hWnd, &rect);
 	InvalidateRect(hWnd, &rect, TRUE);
 
+	connectSerial(hWnd);
 	InitSocket(hWnd);
 
 	return TRUE;
@@ -208,7 +207,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			break;
 		case IDM_EXIT:
 			DestroyWindow(hWnd);
-			//SP->disconnect();
+			SP->disconnect();
 			break;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
@@ -242,6 +241,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		WSACleanup();
 		PostQuitMessage(0);
 		return 0;
+
 	case WM_SOCKET:
 	{
 		switch (WSAGETSELECTEVENT(lParam))
@@ -309,12 +309,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						}
 
 					}
+					SendMessage(hWnd, WM_SERIAL, wParam, FD_READ);
+					
 
-					if (SP->IsConnected())
-					{
-						SP->WriteData(socketInput, payloadLength);
-					}
-					ReadSerial();
+					
 					PostMessage(hWnd, WM_SOCKET, wParam, FD_WRITE);
 				}
 			}
@@ -404,6 +402,50 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			}
 			break;
 		}
+		break;
+	}
+	case WM_SERIAL:
+	{
+					  switch (WSAGETSELECTEVENT(lParam)) {
+						case FD_READ:
+						{
+							
+							if (SP->IsConnected())
+							{
+								BOOLEAN serialState;
+								SP->WriteData(socketInput, payloadLength);
+								serialState = ReadSerial();
+								if (!serialState)
+									failCount++;
+								else
+									failCount = 0;
+								if (failCount > 10)
+									PostMessage(hWnd, WM_SERIAL, wParam, FD_CLOSE);
+							}
+						}
+							break;
+						case FD_CLOSE:
+						{
+										 failCount = 0;
+							SP->disconnect();
+							connectSerial(hWnd);
+
+						}
+							break;
+						case FD_ACCEPT:
+						{
+							PostMessage(hWnd, WM_SERIAL, wParam, FD_READ);
+
+
+						}
+							break;
+						case FD_WRITE:
+						{
+
+						}
+							break;
+						}
+						break;
 	}
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
@@ -431,11 +473,9 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	return (INT_PTR)FALSE;
 }
 
-VOID CALLBACK ReadSerial()
+BOOLEAN CALLBACK ReadSerial()
 {
 	// Receive until the peer shuts down the connection
-	char incomingData[BUFFER_SIZE] = "";
-
 	int dataLength = BUFFER_SIZE;
 
 	ZeroMemory(InputData, sizeof(InputData));
@@ -443,8 +483,12 @@ VOID CALLBACK ReadSerial()
 	if (SP->IsConnected()) {
 		readResult = SP->ReadData(InputData, dataLength);
 		UpdateValue(InputData, readResult);
+		if (readResult < 0)
+			return FALSE;
+		else
+			return TRUE;
 	}
-
+	return FALSE;
 
 } 
 
@@ -570,7 +614,7 @@ VOID UpdateValue(char * inputData, int dataLength)
 	}
 }
 
-BOOL CALLBACK connectSerial() {
+VOID CALLBACK connectSerial(HWND hWnd) {
 	char portName[12];
 	BOOL isConnected = FALSE;
 	for (int i = 0; i < 14; ++i)
@@ -588,11 +632,13 @@ BOOL CALLBACK connectSerial() {
 			BOOL first, second;
 			first = InputData[0] >> 7;
 			second = InputData[1] >> 7;
-			if ((first || second) && !(first && second))
-				return TRUE;
+			if ((first || second) && !(first && second)) {
+				PostMessage(hWnd, WM_SERIAL, NULL, FD_ACCEPT);
+				return;
+			}
 		}
 
 	}
-	MessageBox(NULL, L"아두이노가 올바르게 연결되지 않았습니다.", NULL, NULL);
-	return FALSE;
+	//MessageBox(NULL, L"not connect", NULL, NULL);
+	PostMessage(hWnd, WM_SERIAL, NULL, FD_CLOSE);
 }
