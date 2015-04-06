@@ -5,11 +5,12 @@
 #include "EntryArduino.h"
 #include "Serial.h"
 #include <atlstr.h>
-#include "Windows.h"
+#include "windows.h"
 #include "sckt.h"
 #include <regex>
 #include <string.h>
 #include "sha1.h"
+#include <tchar.h>
 
 using namespace cryptlite;
 
@@ -37,7 +38,7 @@ VOID UpdateValue(char * inputData, int dataLength);
 VOID CALLBACK InitSocket(HWND hWnd);
 VOID CALLBACK connectSerial(HWND hWnd);
 BOOLEAN CALLBACK ReadSerial();
-std::wstring ReadRegValue(HKEY root, std::wstring key, std::wstring name);
+void ReadRegValue(HKEY root, std::wstring key, std::wstring name);
 
 Serial* SP = NULL;
 SOCKET ClientSocket = INVALID_SOCKET;
@@ -628,9 +629,8 @@ VOID CALLBACK connectSerial(HWND hWnd) {
 
 	std::wstring registryValue;
 	//registryValue = ReadRegValue(HKEY_LOCAL_MACHINE, L"HARDWARE\\DEVICEMAP\\SERIALCOMM", L"\\Device\\USBSER000");
-	registryValue = ReadRegValue(HKEY_LOCAL_MACHINE, L"HARDWARE\\DEVICEMAP\\SERIALCOMM", L"\\Device\\Serial1");
-	if (sizeof(registryValue))
-		MessageBox(NULL, registryValue.c_str(), NULL, NULL);
+	ReadRegValue(HKEY_LOCAL_MACHINE,
+		TEXT("HARDWARE\\DEVICEMAP\\SERIALCOMM"), L"\\Device\\Serial2");
 	PostMessage(hWnd, WM_SERIAL, 0, FD_CLOSE);
 	return;
 	char portName[12];
@@ -663,38 +663,120 @@ VOID CALLBACK connectSerial(HWND hWnd) {
 	PostMessage(hWnd, WM_SERIAL, NULL, FD_CLOSE);
 }
 
-std::wstring ReadRegValue(HKEY root, std::wstring key, std::wstring name)
+void ReadRegValue(HKEY root, std::wstring key, std::wstring name)
 {
 	HKEY hKey;
 	DWORD type;
 	DWORD cbData;
-	if (RegOpenKeyEx(root, key.c_str(), 0, KEY_QUERY_VALUE | KEY_ENUMERATE_SUB_KEYS | KEY_READ, &hKey) != ERROR_SUCCESS)
+
+	TCHAR    achKey[255];   // buffer for subkey name
+	DWORD    cbName;                   // size of name string 
+	TCHAR    achClass[MAX_PATH] = TEXT("");  // buffer for class name 
+	DWORD    cchClassName = MAX_PATH;  // size of class string 
+	DWORD    cSubKeys = 0;               // number of subkeys 
+	DWORD    cbMaxSubKey;              // longest subkey size 
+	DWORD    cchMaxClass;              // longest class string 
+	DWORD    cValues;              // number of values for key 
+	DWORD    cchMaxValue;          // longest value name 
+	DWORD    cbMaxValueData;       // longest value data 
+	DWORD    cbSecurityDescriptor; // size of security descriptor 
+	FILETIME ftLastWriteTime;      // last write time 
+
+	DWORD i, retCode;
+
+	TCHAR  achValue[16383];
+	DWORD cchValue = 16383;
+
+
+	if (RegOpenKeyEx(root, key.c_str(), 0, KEY_READ, &hKey) != ERROR_SUCCESS)
 		throw "Could not open registry key";
 
-	if (RegQueryValueEx(hKey, name.c_str(), NULL, &type, NULL, &cbData) != ERROR_SUCCESS)
+	retCode = RegQueryInfoKey(
+		hKey,                    // key handle 
+		achClass,                // buffer for class name 
+		&cchClassName,           // size of class string 
+		NULL,                    // reserved 
+		&cSubKeys,               // number of subkeys 
+		&cbMaxSubKey,            // longest subkey size 
+		&cchMaxClass,            // longest class string 
+		&cValues,                // number of values for this key 
+		&cchMaxValue,            // longest value name 
+		&cbMaxValueData,         // longest value data 
+		&cbSecurityDescriptor,   // security descriptor 
+		&ftLastWriteTime);       // last write time 
+
+	// Enumerate the subkeys, until RegEnumKeyEx fails.
+
+	if (cSubKeys)
 	{
-		RegCloseKey(hKey);
-		throw "Could not read registry value";
+		printf("\nNumber of subkeys: %d\n", cSubKeys);
+
+		for (i = 0; i<cSubKeys; i++)
+		{
+
+			MessageBox(NULL, L"asdf", NULL, NULL);
+			cbName = 255;
+			retCode = RegEnumKeyEx(hKey, i,
+				achKey,
+				&cbName,
+				NULL,
+				NULL,
+				NULL,
+				&ftLastWriteTime);
+			if (retCode == ERROR_SUCCESS)
+			{
+				MessageBox(NULL, achKey, NULL, NULL);
+			}
+		}
 	}
 
-	if (type != REG_SZ)
+	if (cValues)
 	{
-		RegCloseKey(hKey);
-		throw "Incorrect registry value type";
-	}
 
-	std::wstring value(cbData / sizeof(wchar_t), L'\0');
-	if (RegQueryValueEx(hKey, name.c_str(), NULL, NULL, reinterpret_cast<LPBYTE>(&value[0]), &cbData) != ERROR_SUCCESS)
-	{
-		RegCloseKey(hKey);
-		throw "Could not read registry value";
-	}
+		for (i = 0, retCode = ERROR_SUCCESS; i<cValues; i++)
+		{
+			cchValue = 16383;
+			achValue[0] = '\0';
+			retCode = RegEnumValue(hKey, i,
+				achValue,
+				&cchValue,
+				NULL,
+				NULL,
+				NULL,
+				NULL);
 
+			if (retCode == ERROR_SUCCESS)
+			{
+				MessageBox(NULL, achValue, NULL, NULL);
+				
+				RegQueryValueEx(hKey, achValue, NULL, &type, NULL, &cbData);
+				if (RegQueryValueEx(hKey, achValue, NULL, &type, NULL, &cbData) != ERROR_SUCCESS)
+				{
+					RegCloseKey(hKey);
+					throw "Could not read registry value";
+				}
+
+				if (type != REG_SZ)
+				{
+					RegCloseKey(hKey);
+					throw "Incorrect registry value type";
+				}
+
+				std::wstring value(cbData / sizeof(wchar_t), L'\0');
+				if (RegQueryValueEx(hKey, achValue, NULL, NULL, reinterpret_cast<LPBYTE>(&value[0]), &cbData) != ERROR_SUCCESS)
+				{
+					RegCloseKey(hKey);
+					throw "Could not read registry value";
+				}
+
+
+				size_t firstNull = value.find_first_of(L'\0');
+				if (firstNull != std::string::npos)
+					value.resize(firstNull);
+				MessageBox(NULL, value.c_str(), NULL, NULL);
+				
+			}
+		}
+	}
 	RegCloseKey(hKey);
-
-	size_t firstNull = value.find_first_of(L'\0');
-	if (firstNull != std::string::npos)
-		value.resize(firstNull);
-
-	return value;
 }
