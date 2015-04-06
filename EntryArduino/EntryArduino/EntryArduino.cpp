@@ -5,6 +5,7 @@
 #include "EntryArduino.h"
 #include "Serial.h"
 #include <atlstr.h>
+#include "Windows.h"
 #include "sckt.h"
 #include <regex>
 #include <string.h>
@@ -36,6 +37,7 @@ VOID UpdateValue(char * inputData, int dataLength);
 VOID CALLBACK InitSocket(HWND hWnd);
 VOID CALLBACK connectSerial(HWND hWnd);
 BOOLEAN CALLBACK ReadSerial();
+std::wstring ReadRegValue(HKEY root, std::wstring key, std::wstring name);
 
 Serial* SP = NULL;
 SOCKET ClientSocket = INVALID_SOCKET;
@@ -623,6 +625,14 @@ VOID UpdateValue(char * inputData, int dataLength)
 }
 
 VOID CALLBACK connectSerial(HWND hWnd) {
+
+	std::wstring registryValue;
+	//registryValue = ReadRegValue(HKEY_LOCAL_MACHINE, L"HARDWARE\\DEVICEMAP\\SERIALCOMM", L"\\Device\\USBSER000");
+	registryValue = ReadRegValue(HKEY_LOCAL_MACHINE, L"HARDWARE\\DEVICEMAP\\SERIALCOMM", L"\\Device\\Serial1");
+	if (sizeof(registryValue))
+		MessageBox(NULL, registryValue.c_str(), NULL, NULL);
+	PostMessage(hWnd, WM_SERIAL, 0, FD_CLOSE);
+	return;
 	char portName[12];
 	BOOL isConnected = FALSE;
 	if (SP && SP->IsConnected())
@@ -651,4 +661,40 @@ VOID CALLBACK connectSerial(HWND hWnd) {
 	}
 	//MessageBox(NULL, L"not connect", NULL, NULL);
 	PostMessage(hWnd, WM_SERIAL, NULL, FD_CLOSE);
+}
+
+std::wstring ReadRegValue(HKEY root, std::wstring key, std::wstring name)
+{
+	HKEY hKey;
+	DWORD type;
+	DWORD cbData;
+	if (RegOpenKeyEx(root, key.c_str(), 0, KEY_QUERY_VALUE | KEY_ENUMERATE_SUB_KEYS | KEY_READ, &hKey) != ERROR_SUCCESS)
+		throw "Could not open registry key";
+
+	if (RegQueryValueEx(hKey, name.c_str(), NULL, &type, NULL, &cbData) != ERROR_SUCCESS)
+	{
+		RegCloseKey(hKey);
+		throw "Could not read registry value";
+	}
+
+	if (type != REG_SZ)
+	{
+		RegCloseKey(hKey);
+		throw "Incorrect registry value type";
+	}
+
+	std::wstring value(cbData / sizeof(wchar_t), L'\0');
+	if (RegQueryValueEx(hKey, name.c_str(), NULL, NULL, reinterpret_cast<LPBYTE>(&value[0]), &cbData) != ERROR_SUCCESS)
+	{
+		RegCloseKey(hKey);
+		throw "Could not read registry value";
+	}
+
+	RegCloseKey(hKey);
+
+	size_t firstNull = value.find_first_of(L'\0');
+	if (firstNull != std::string::npos)
+		value.resize(firstNull);
+
+	return value;
 }
