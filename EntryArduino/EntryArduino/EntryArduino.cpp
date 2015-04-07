@@ -10,7 +10,7 @@
 #include <regex>
 #include <string.h>
 #include "sha1.h"
-#include <tchar.h>
+#include "enumser.h"
 
 using namespace cryptlite;
 
@@ -21,6 +21,8 @@ using namespace cryptlite;
 #define WM_SOCKET		104
 #define WM_SERIAL		(WM_USER + 0x0001)
 #define SERVER_HASH_KEY "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+#define MAX_KEY_LENGTH 255
+#define MAX_VALUE_NAME 16383
 char szHistory[10000];
 
 // Global Variables:
@@ -38,7 +40,7 @@ VOID UpdateValue(char * inputData, int dataLength);
 VOID CALLBACK InitSocket(HWND hWnd);
 VOID CALLBACK connectSerial(HWND hWnd);
 BOOLEAN CALLBACK ReadSerial();
-void ReadRegValue(HKEY root, std::wstring key, std::wstring name);
+void ReadRegValue(HKEY root, std::wstring key);
 
 Serial* SP = NULL;
 SOCKET ClientSocket = INVALID_SOCKET;
@@ -56,6 +58,8 @@ int digitalValue[14];
 
 char socketInput[1024];
 int payloadLength;
+
+
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
                      _In_ LPTSTR    lpCmdLine,
@@ -171,8 +175,23 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	GetClientRect(hWnd, &rect);
 	InvalidateRect(hWnd, &rect, TRUE);
 
+	HRESULT hr = CoInitialize(NULL);
+	if (FAILED(hr))
+	{
+		_tprintf(_T("Failed to initialize COM, Error:%x\n"), hr);
+		return FALSE;
+	}
+
+	//Initialize COM security (Required by CEnumerateSerial::UsingWMI)
+	hr = CoInitializeSecurity(NULL, -1, NULL, NULL, RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, EOAC_NONE, NULL);
+	if (FAILED(hr))
+	{
+		_tprintf(_T("Failed to initialize COM security, Error:%x\n"), hr);
+		CoUninitialize();
+		return FALSE;
+	}
+
 	PostMessage(hWnd, WM_SERIAL, NULL, FD_CLOSE);
-	InitSocket(hWnd);
 
 	return TRUE;
 }
@@ -196,8 +215,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	switch (message)
 	{
 	case WM_CREATE:
-
-
 		break;
 	case WM_COMMAND:
 		wmId    = LOWORD(wParam);
@@ -627,12 +644,33 @@ VOID UpdateValue(char * inputData, int dataLength)
 
 VOID CALLBACK connectSerial(HWND hWnd) {
 
+
+	CSimpleArray<UINT> ports;
+	CSimpleArray<CString> friendlyNames;
+	CSimpleArray<CString> sPorts;
+	int i = 0;
+	UNREFERENCED_PARAMETER(i);
+
+	_tprintf(_T("WMI method reports\n"));
+	if (CEnumerateSerial::UsingWMI(ports, friendlyNames))
+	{
+		for (i = 0; i < ports.GetSize(); i++) {
+			char str[30];
+			LPCTSTR friendlyName = friendlyNames[i].operator LPCTSTR();
+			sprintf_s(str, "COM%u <%s>\n", ports[i], friendlyName);
+			OutputDebugStringA(str);
+			OutputDebugString(L"\n");
+			OutputDebugString(friendlyName);
+			OutputDebugString(L"\n");
+		}
+	}
+	return;
 	std::wstring registryValue;
 	//registryValue = ReadRegValue(HKEY_LOCAL_MACHINE, L"HARDWARE\\DEVICEMAP\\SERIALCOMM", L"\\Device\\USBSER000");
-	ReadRegValue(HKEY_LOCAL_MACHINE,
-		TEXT("HARDWARE\\DEVICEMAP\\SERIALCOMM"), L"\\Device\\Serial2");
+	ReadRegValue(HKEY_LOCAL_MACHINE, TEXT("HARDWARE\\DEVICEMAP\\SERIALCOMM"));
 	PostMessage(hWnd, WM_SERIAL, 0, FD_CLOSE);
 	return;
+
 	char portName[12];
 	BOOL isConnected = FALSE;
 	if (SP && SP->IsConnected())
@@ -659,17 +697,16 @@ VOID CALLBACK connectSerial(HWND hWnd) {
 		}
 
 	}
-	//MessageBox(NULL, L"not connect", NULL, NULL);
 	PostMessage(hWnd, WM_SERIAL, NULL, FD_CLOSE);
 }
 
-void ReadRegValue(HKEY root, std::wstring key, std::wstring name)
+void ReadRegValue(HKEY root, std::wstring key)
 {
 	HKEY hKey;
 	DWORD type;
 	DWORD cbData;
 
-	TCHAR    achKey[255];   // buffer for subkey name
+	TCHAR    achKey[MAX_KEY_LENGTH];   // buffer for subkey name
 	DWORD    cbName;                   // size of name string 
 	TCHAR    achClass[MAX_PATH] = TEXT("");  // buffer for class name 
 	DWORD    cchClassName = MAX_PATH;  // size of class string 
@@ -684,8 +721,8 @@ void ReadRegValue(HKEY root, std::wstring key, std::wstring name)
 
 	DWORD i, retCode;
 
-	TCHAR  achValue[16383];
-	DWORD cchValue = 16383;
+	TCHAR  achValue[MAX_VALUE_NAME];
+	DWORD cchValue = MAX_VALUE_NAME;
 
 
 	if (RegOpenKeyEx(root, key.c_str(), 0, KEY_READ, &hKey) != ERROR_SUCCESS)
@@ -705,37 +742,12 @@ void ReadRegValue(HKEY root, std::wstring key, std::wstring name)
 		&cbSecurityDescriptor,   // security descriptor 
 		&ftLastWriteTime);       // last write time 
 
-	// Enumerate the subkeys, until RegEnumKeyEx fails.
-
-	if (cSubKeys)
-	{
-		printf("\nNumber of subkeys: %d\n", cSubKeys);
-
-		for (i = 0; i<cSubKeys; i++)
-		{
-
-			MessageBox(NULL, L"asdf", NULL, NULL);
-			cbName = 255;
-			retCode = RegEnumKeyEx(hKey, i,
-				achKey,
-				&cbName,
-				NULL,
-				NULL,
-				NULL,
-				&ftLastWriteTime);
-			if (retCode == ERROR_SUCCESS)
-			{
-				MessageBox(NULL, achKey, NULL, NULL);
-			}
-		}
-	}
-
 	if (cValues)
 	{
 
 		for (i = 0, retCode = ERROR_SUCCESS; i<cValues; i++)
 		{
-			cchValue = 16383;
+			cchValue = MAX_VALUE_NAME;
 			achValue[0] = '\0';
 			retCode = RegEnumValue(hKey, i,
 				achValue,
@@ -747,7 +759,8 @@ void ReadRegValue(HKEY root, std::wstring key, std::wstring name)
 
 			if (retCode == ERROR_SUCCESS)
 			{
-				MessageBox(NULL, achValue, NULL, NULL);
+				OutputDebugString(achValue);
+				OutputDebugString(_T(" : "));
 				
 				RegQueryValueEx(hKey, achValue, NULL, &type, NULL, &cbData);
 				if (RegQueryValueEx(hKey, achValue, NULL, &type, NULL, &cbData) != ERROR_SUCCESS)
@@ -773,7 +786,9 @@ void ReadRegValue(HKEY root, std::wstring key, std::wstring name)
 				size_t firstNull = value.find_first_of(L'\0');
 				if (firstNull != std::string::npos)
 					value.resize(firstNull);
-				MessageBox(NULL, value.c_str(), NULL, NULL);
+
+				OutputDebugString(value.c_str());
+				OutputDebugString(_T("\n"));
 				
 			}
 		}
