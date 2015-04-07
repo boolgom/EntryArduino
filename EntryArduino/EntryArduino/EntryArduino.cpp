@@ -11,6 +11,7 @@
 #include <string.h>
 #include "sha1.h"
 #include "enumser.h"
+#include "ShellApi.h"
 
 using namespace cryptlite;
 
@@ -32,6 +33,8 @@ TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
 char InputData[BUFFER_SIZE];
 CSimpleArray<UINT> availablePorts;
 BOOL isSerialConnected = false;
+int selectedSerialPort;
+std::wstring currentPath;
 
 // Forward declarations of functions included in this code module:
 ATOM				MyRegisterClass(HINSTANCE hInstance);
@@ -43,6 +46,9 @@ VOID CALLBACK InitSocket(HWND hWnd);
 VOID CALLBACK connectSerial(HWND hWnd, int port);
 BOOLEAN CALLBACK ReadSerial();
 VOID findPorts();
+VOID executeShellCmd(HWND hWnd, LPCTSTR file, LPCTSTR option);
+BOOL IsWow64();
+std::wstring ExePath();
 
 Serial* SP = NULL;
 SOCKET ClientSocket = INVALID_SOCKET;
@@ -208,6 +214,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
 	case WM_CREATE:
 		InitSocket(hWnd);
+		//if (IsWow64())
+			//MessageBox(NULL, L"This is 64bit OS.", NULL, NULL);
+		currentPath = ExePath();
+		OutputDebugString(currentPath.c_str());
 		break;
 	case WM_COMMAND:
 		wmId    = LOWORD(wParam);
@@ -223,6 +233,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				SP->disconnect();
 			DestroyWindow(hWnd);
 			break;
+		case IDC_ARDUINO_DRIVER:
+		{
+			std::wstring driverPath = currentPath;
+			driverPath += L"\\arduino.exe";
+			OutputDebugString(driverPath.c_str());
+			executeShellCmd(hWnd, L"C:\\Users\\boolgom\\Develop\\EntryArduino\\EntryArduino\\Debug\\arduino.exe", L"");
+			break;
+		}
 		case ID_COMBOBOX:
 			switch (wmEvent) {
 			case CBN_DROPDOWN:
@@ -234,10 +252,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				char str[128];
 				SendMessage(hCombo, CB_GETLBTEXT, i, (LPARAM)str);
 				connectSerial(hWnd, availablePorts[i]);
-				//MessageBox(NULL, (LPCWSTR)str, NULL, NULL);
-				//findPorts();
+				selectedSerialPort = availablePorts[i];
 				break;
 			}
+			break;
+
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
 		}
@@ -719,4 +738,37 @@ VOID CALLBACK connectSerial(HWND hWnd, int port) {
 
 	MessageBox(NULL, L"아두이노가 연결에 실패했습니다.", NULL, NULL);
 	PostMessage(hWnd, WM_SERIAL, NULL, FD_CLOSE);
+}
+
+VOID executeShellCmd(HWND hWnd, LPCTSTR file, LPCTSTR option) {
+	ShellExecute(hWnd, NULL, file, option, NULL, SW_HIDE);
+}
+
+BOOL IsWow64()
+{
+	BOOL bIsWow64 = FALSE;
+	typedef BOOL(WINAPI *LPFN_ISWOW64PROCESS) (HANDLE, PBOOL);
+	LPFN_ISWOW64PROCESS fnIsWow64Process;
+	//IsWow64Process is not available on all supported versions of Windows.
+	//Use GetModuleHandle to get a handle to the DLL that contains the function
+	//and GetProcAddress to get a pointer to the function if available.
+
+	fnIsWow64Process = (LPFN_ISWOW64PROCESS)GetProcAddress(
+		GetModuleHandle(TEXT("kernel32")), "IsWow64Process");
+
+	if (NULL != fnIsWow64Process)
+	{
+		if (!fnIsWow64Process(GetCurrentProcess(), &bIsWow64))
+		{
+			//handle error
+		}
+	}
+	return bIsWow64;
+}
+
+std::wstring ExePath() {
+	wchar_t buffer[MAX_PATH];
+	GetModuleFileName(NULL, buffer, MAX_PATH);
+	std::wstring::size_type pos = std::wstring(buffer).find_last_of(L"\\/");
+	return std::wstring(buffer).substr(0, pos);
 }
