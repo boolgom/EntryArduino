@@ -23,13 +23,16 @@ using namespace cryptlite;
 #define SERVER_HASH_KEY "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 #define MAX_KEY_LENGTH 255
 #define MAX_VALUE_NAME 16383
+#define ID_COMBOBOX 106
 char szHistory[10000];
 
 // Global Variables:
 HINSTANCE hInst;								// current instance
+HWND hCombo;
 TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
 char InputData[BUFFER_SIZE];
+CSimpleArray<UINT> availablePorts;
 
 // Forward declarations of functions included in this code module:
 ATOM				MyRegisterClass(HINSTANCE hInstance);
@@ -38,9 +41,10 @@ LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
 VOID UpdateValue(char * inputData, int dataLength);
 VOID CALLBACK InitSocket(HWND hWnd);
-VOID CALLBACK connectSerial(HWND hWnd);
+VOID CALLBACK connectSerial(HWND hWnd, int port);
 BOOLEAN CALLBACK ReadSerial();
 void ReadRegValue(HKEY root, std::wstring key);
+VOID findPorts();
 
 Serial* SP = NULL;
 SOCKET ClientSocket = INVALID_SOCKET;
@@ -168,6 +172,11 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	if (!hWnd)
 		return FALSE;
 		
+
+
+	hCombo = CreateWindow(L"combobox", NULL, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST,
+		10, 10, 250, 200, hWnd, (HMENU)ID_COMBOBOX, hInstance, NULL);
+
 	ShowWindow(hWnd, nCmdShow);
 	hdc = BeginPaint(hWnd, &ps);
 
@@ -175,21 +184,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	GetClientRect(hWnd, &rect);
 	InvalidateRect(hWnd, &rect, TRUE);
 
-	HRESULT hr = CoInitialize(NULL);
-	if (FAILED(hr))
-	{
-		_tprintf(_T("Failed to initialize COM, Error:%x\n"), hr);
-		return FALSE;
-	}
-
-	//Initialize COM security (Required by CEnumerateSerial::UsingWMI)
-	hr = CoInitializeSecurity(NULL, -1, NULL, NULL, RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, EOAC_NONE, NULL);
-	if (FAILED(hr))
-	{
-		_tprintf(_T("Failed to initialize COM security, Error:%x\n"), hr);
-		CoUninitialize();
-		return FALSE;
-	}
 
 	PostMessage(hWnd, WM_SERIAL, NULL, FD_CLOSE);
 
@@ -215,6 +209,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	switch (message)
 	{
 	case WM_CREATE:
+		InitSocket(hWnd);
 		break;
 	case WM_COMMAND:
 		wmId    = LOWORD(wParam);
@@ -229,6 +224,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			DestroyWindow(hWnd);
 			SP->disconnect();
 			break;
+		case ID_COMBOBOX:
+			switch (wmEvent) {
+			case CBN_DROPDOWN:
+				findPorts();
+				break;
+			case CBN_SELCHANGE:
+				int i = 0;
+				i = SendMessage(hCombo, CB_GETCURSEL, 0, 0);
+				char str[128];
+				SendMessage(hCombo, CB_GETLBTEXT, i, (LPARAM)str);
+				connectSerial(hWnd, availablePorts[i]);
+				//MessageBox(NULL, (LPCWSTR)str, NULL, NULL);
+				//findPorts();
+				break;
+			}
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
 		}
@@ -266,7 +276,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		WSACleanup();
 		PostQuitMessage(0);
 		return 0;
-
 	case WM_SOCKET:
 	{
 		switch (WSAGETSELECTEVENT(lParam))
@@ -454,8 +463,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			{
 				if (SP)
 					SP->disconnect();
+				findPorts();
+				//PostMessage(hWnd, WM_SERIAL, wParam, FD_CLOSE);
 				SendMessage(hWnd, WM_PAINT, wParam, NULL);
-				connectSerial(hWnd);
 				failCount = 0;
 			}
 				break;
@@ -642,34 +652,45 @@ VOID UpdateValue(char * inputData, int dataLength)
 	}
 }
 
-VOID CALLBACK connectSerial(HWND hWnd) {
-
+VOID findPorts() {
+	int comboboxCount = 0;
+	comboboxCount = SendMessage(hCombo, CB_GETCOUNT, 0, 0);
+	for (int i = 0; i < comboboxCount; i++)
+		SendMessage(hCombo, CB_DELETESTRING, 0, 0);
 
 	CSimpleArray<UINT> ports;
 	CSimpleArray<CString> friendlyNames;
-	CSimpleArray<CString> sPorts;
 	int i = 0;
 	UNREFERENCED_PARAMETER(i);
 
-	_tprintf(_T("WMI method reports\n"));
-	if (CEnumerateSerial::UsingWMI(ports, friendlyNames))
+	_tprintf(_T("Device Manager (SetupAPI - Ports Device information set) reports\n"));
+	if (CEnumerateSerial::UsingSetupAPI2(ports, friendlyNames))
 	{
-		for (i = 0; i < ports.GetSize(); i++) {
-			char str[30];
-			LPCTSTR friendlyName = friendlyNames[i].operator LPCTSTR();
-			sprintf_s(str, "COM%u <%s>\n", ports[i], friendlyName);
-			OutputDebugStringA(str);
-			OutputDebugString(L"\n");
-			OutputDebugString(friendlyName);
-			OutputDebugString(L"\n");
+		for (i = 0; i < ports.GetSize(); i++){
+
+			char friendlyname[30];
+			TCHAR fdn[30] = { 0, };
+			sprintf_s(friendlyname, "(COM%u) %S", ports[i], friendlyNames[i]);
+			MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, friendlyname, strlen(friendlyname), fdn, 256);
+			SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)fdn);
 		}
+		availablePorts = ports;
 	}
-	return;
+	else
+		_tprintf(_T("CEnumerateSerial::UsingSetupAPI2 failed, Error:%u\n"), GetLastError());
+
+}
+
+VOID CALLBACK connectSerial(HWND hWnd, int port) {
+
+
+
+	/*
 	std::wstring registryValue;
 	//registryValue = ReadRegValue(HKEY_LOCAL_MACHINE, L"HARDWARE\\DEVICEMAP\\SERIALCOMM", L"\\Device\\USBSER000");
 	ReadRegValue(HKEY_LOCAL_MACHINE, TEXT("HARDWARE\\DEVICEMAP\\SERIALCOMM"));
 	PostMessage(hWnd, WM_SERIAL, 0, FD_CLOSE);
-	return;
+	*/
 
 	char portName[12];
 	BOOL isConnected = FALSE;
@@ -679,24 +700,24 @@ VOID CALLBACK connectSerial(HWND hWnd) {
 	{
 		digitalValue[i] = 0;
 	}
-	for (int port = 1; port < 25; port++) {
-		sprintf_s(portName, "\\\\.\\COM%d", port);
-		SP = new Serial(portName);
-		if (SP->IsConnected())
-		{
-			int dataLength = BUFFER_SIZE;
-			ZeroMemory(InputData, sizeof(InputData));
-			SP->ReadData(InputData, dataLength);
-			BOOL first, second;
-			first = InputData[0] >> 7;
-			second = InputData[1] >> 7;
-			if ((first || second) && !(first && second)) {
-				PostMessage(hWnd, WM_SERIAL, NULL, FD_ACCEPT);
-				return;
-			}
+	sprintf_s(portName, "\\\\.\\COM%d", port);
+	SP = new Serial(portName);
+	if (SP->IsConnected())
+	{
+		int dataLength = BUFFER_SIZE;
+		ZeroMemory(InputData, sizeof(InputData));
+		SP->ReadData(InputData, dataLength);
+		BOOL first, second;
+		first = InputData[0] >> 7;
+		second = InputData[1] >> 7;
+		if ((first || second) && !(first && second)) {
+			PostMessage(hWnd, WM_SERIAL, NULL, FD_ACCEPT);
+			MessageBox(NULL, L"아두이노가 연결되었습니다", NULL, NULL);
+			OutputDebugString(L"asfd");
+			return;
 		}
-
 	}
+
 	PostMessage(hWnd, WM_SERIAL, NULL, FD_CLOSE);
 }
 
