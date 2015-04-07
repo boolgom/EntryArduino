@@ -18,12 +18,10 @@ using namespace cryptlite;
 #define BUFFER_SIZE 10000
 #define DEFAULT_PORT "23518"
 #define SERIAL_INTERVAL 15
-#define WM_SOCKET		104
 #define WM_SERIAL		(WM_USER + 0x0001)
 #define SERVER_HASH_KEY "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 #define MAX_KEY_LENGTH 255
 #define MAX_VALUE_NAME 16383
-#define ID_COMBOBOX 106
 char szHistory[10000];
 
 // Global Variables:
@@ -33,6 +31,7 @@ TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
 char InputData[BUFFER_SIZE];
 CSimpleArray<UINT> availablePorts;
+BOOL isSerialConnected = false;
 
 // Forward declarations of functions included in this code module:
 ATOM				MyRegisterClass(HINSTANCE hInstance);
@@ -43,7 +42,6 @@ VOID UpdateValue(char * inputData, int dataLength);
 VOID CALLBACK InitSocket(HWND hWnd);
 VOID CALLBACK connectSerial(HWND hWnd, int port);
 BOOLEAN CALLBACK ReadSerial();
-void ReadRegValue(HKEY root, std::wstring key);
 VOID findPorts();
 
 Serial* SP = NULL;
@@ -221,8 +219,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
 			break;
 		case IDM_EXIT:
+			if (SP && SP->IsConnected())
+				SP->disconnect();
 			DestroyWindow(hWnd);
-			SP->disconnect();
 			break;
 		case ID_COMBOBOX:
 			switch (wmEvent) {
@@ -272,7 +271,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 		// socket cleanup
 		closesocket(ClientSocket);
-		SP->disconnect();
+		if (SP && SP->IsConnected())
+			SP->disconnect();
 		WSACleanup();
 		PostQuitMessage(0);
 		return 0;
@@ -682,9 +682,6 @@ VOID findPorts() {
 }
 
 VOID CALLBACK connectSerial(HWND hWnd, int port) {
-
-
-
 	/*
 	std::wstring registryValue;
 	//registryValue = ReadRegValue(HKEY_LOCAL_MACHINE, L"HARDWARE\\DEVICEMAP\\SERIALCOMM", L"\\Device\\USBSER000");
@@ -694,8 +691,10 @@ VOID CALLBACK connectSerial(HWND hWnd, int port) {
 
 	char portName[12];
 	BOOL isConnected = FALSE;
-	if (SP && SP->IsConnected())
-		return;
+	if (SP && SP->IsConnected()) {
+		SP->disconnect();
+		//return;
+	}
 	for (int i = 0; i < 14; ++i)
 	{
 		digitalValue[i] = 0;
@@ -713,106 +712,11 @@ VOID CALLBACK connectSerial(HWND hWnd, int port) {
 		if ((first || second) && !(first && second)) {
 			PostMessage(hWnd, WM_SERIAL, NULL, FD_ACCEPT);
 			MessageBox(NULL, L"아두이노가 연결되었습니다", NULL, NULL);
-			OutputDebugString(L"asfd");
+			isSerialConnected = true;
 			return;
 		}
 	}
 
+	MessageBox(NULL, L"아두이노가 연결에 실패했습니다.", NULL, NULL);
 	PostMessage(hWnd, WM_SERIAL, NULL, FD_CLOSE);
-}
-
-void ReadRegValue(HKEY root, std::wstring key)
-{
-	HKEY hKey;
-	DWORD type;
-	DWORD cbData;
-
-	TCHAR    achKey[MAX_KEY_LENGTH];   // buffer for subkey name
-	DWORD    cbName;                   // size of name string 
-	TCHAR    achClass[MAX_PATH] = TEXT("");  // buffer for class name 
-	DWORD    cchClassName = MAX_PATH;  // size of class string 
-	DWORD    cSubKeys = 0;               // number of subkeys 
-	DWORD    cbMaxSubKey;              // longest subkey size 
-	DWORD    cchMaxClass;              // longest class string 
-	DWORD    cValues;              // number of values for key 
-	DWORD    cchMaxValue;          // longest value name 
-	DWORD    cbMaxValueData;       // longest value data 
-	DWORD    cbSecurityDescriptor; // size of security descriptor 
-	FILETIME ftLastWriteTime;      // last write time 
-
-	DWORD i, retCode;
-
-	TCHAR  achValue[MAX_VALUE_NAME];
-	DWORD cchValue = MAX_VALUE_NAME;
-
-
-	if (RegOpenKeyEx(root, key.c_str(), 0, KEY_READ, &hKey) != ERROR_SUCCESS)
-		throw "Could not open registry key";
-
-	retCode = RegQueryInfoKey(
-		hKey,                    // key handle 
-		achClass,                // buffer for class name 
-		&cchClassName,           // size of class string 
-		NULL,                    // reserved 
-		&cSubKeys,               // number of subkeys 
-		&cbMaxSubKey,            // longest subkey size 
-		&cchMaxClass,            // longest class string 
-		&cValues,                // number of values for this key 
-		&cchMaxValue,            // longest value name 
-		&cbMaxValueData,         // longest value data 
-		&cbSecurityDescriptor,   // security descriptor 
-		&ftLastWriteTime);       // last write time 
-
-	if (cValues)
-	{
-
-		for (i = 0, retCode = ERROR_SUCCESS; i<cValues; i++)
-		{
-			cchValue = MAX_VALUE_NAME;
-			achValue[0] = '\0';
-			retCode = RegEnumValue(hKey, i,
-				achValue,
-				&cchValue,
-				NULL,
-				NULL,
-				NULL,
-				NULL);
-
-			if (retCode == ERROR_SUCCESS)
-			{
-				OutputDebugString(achValue);
-				OutputDebugString(_T(" : "));
-				
-				RegQueryValueEx(hKey, achValue, NULL, &type, NULL, &cbData);
-				if (RegQueryValueEx(hKey, achValue, NULL, &type, NULL, &cbData) != ERROR_SUCCESS)
-				{
-					RegCloseKey(hKey);
-					throw "Could not read registry value";
-				}
-
-				if (type != REG_SZ)
-				{
-					RegCloseKey(hKey);
-					throw "Incorrect registry value type";
-				}
-
-				std::wstring value(cbData / sizeof(wchar_t), L'\0');
-				if (RegQueryValueEx(hKey, achValue, NULL, NULL, reinterpret_cast<LPBYTE>(&value[0]), &cbData) != ERROR_SUCCESS)
-				{
-					RegCloseKey(hKey);
-					throw "Could not read registry value";
-				}
-
-
-				size_t firstNull = value.find_first_of(L'\0');
-				if (firstNull != std::string::npos)
-					value.resize(firstNull);
-
-				OutputDebugString(value.c_str());
-				OutputDebugString(_T("\n"));
-				
-			}
-		}
-	}
-	RegCloseKey(hKey);
 }

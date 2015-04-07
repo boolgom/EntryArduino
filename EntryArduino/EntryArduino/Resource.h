@@ -13,6 +13,20 @@
 #define IDI_ENTRYARDUINO			107
 #define IDI_SMALL				108
 #define IDC_ENTRYARDUINO			109
+#define WM_SOCKET				111
+
+#define IDC_ARDUINO_DRIVER		112
+#define IDC_COMPAT_DRIVER		113
+#define IDC_INJECT_FIRMWARE		114
+#define IDC_SELECT_UNO			115
+#define IDC_SELECT_GAL			116
+
+#define ID_COMBOBOX				118
+
+
+
+
+
 #define IDC_MYICON				2
 #ifndef IDC_STATIC
 #define IDC_STATIC				-1
