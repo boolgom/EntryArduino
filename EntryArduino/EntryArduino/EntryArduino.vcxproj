@@ -111,6 +111,7 @@
   <ItemGroup>
     <Image Include="..\..\..\Entry\public\img\icons\entry.ico" />
     <Image Include="arduino.bmp" />
+    <Image Include="entry.ico" />
     <Image Include="EntryArduino.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

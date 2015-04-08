@@ -238,7 +238,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			std::wstring driverPath = currentPath;
 			driverPath += L"\\arduino.exe";
 			OutputDebugString(driverPath.c_str());
-			executeShellCmd(hWnd, L"C:\\Users\\boolgom\\Develop\\EntryArduino\\EntryArduino\\Debug\\arduino.exe", L"");
+			executeShellCmd(hWnd,
+				L"C:\\Users\\boolgom\\Develop\\EntryArduino\\EntryArduino\\Debug\\avr.exe",
+				L"");
 			break;
 		}
 		case ID_COMBOBOX:
@@ -741,7 +743,7 @@ VOID CALLBACK connectSerial(HWND hWnd, int port) {
 }
 
 VOID executeShellCmd(HWND hWnd, LPCTSTR file, LPCTSTR option) {
-	ShellExecute(hWnd, NULL, file, option, NULL, SW_HIDE);
+	ShellExecute(hWnd, NULL, file, option, currentPath.c_str(), SW_SHOW);
 }
 
 BOOL IsWow64()
