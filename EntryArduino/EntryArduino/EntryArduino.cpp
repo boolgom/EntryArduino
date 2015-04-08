@@ -49,6 +49,7 @@ VOID findPorts();
 VOID executeShellCmd(HWND hWnd, LPCTSTR file, LPCTSTR option, LPCTSTR path);
 BOOL IsWow64();
 std::wstring ExePath();
+VOID drawPaint(HWND hWnd);
 
 Serial* SP = NULL;
 SOCKET ClientSocket = INVALID_SOCKET;
@@ -165,8 +166,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	dwStyle,
 	CW_USEDEFAULT,
 	CW_USEDEFAULT,
-	300,
-	150,
+	285,
+	140,
 	NULL,
 	NULL,
 	hInstance,
@@ -178,7 +179,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		
 
 
-	hCombo = CreateWindow(L"combobox", NULL, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST,
+	hCombo = CreateWindow(L"combobox", _T("Entry Arduino"), WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST,
 		10, 10, 250, 200, hWnd, (HMENU)ID_COMBOBOX, hInstance, NULL);
 
 	ShowWindow(hWnd, nCmdShow);
@@ -242,7 +243,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			else
 				driverPath += L"\\drivers\\arduino\\dpinst-x86.exe";
 			executePath += L"\\drivers\\arduino";
-			OutputDebugString(driverPath.c_str());
 			executeShellCmd(hWnd,
 				driverPath.c_str(),
 				L"",
@@ -255,26 +255,64 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			std::wstring executePath = currentPath;
 			driverPath += L"\\drivers\\compat\\SETUP.EXE";
 			executePath += L"\\drivers\\compat";
-			OutputDebugString(driverPath.c_str());
 			executeShellCmd(hWnd,
 				driverPath.c_str(),
 				L"",
 				executePath.c_str());
-			OutputDebugString(driverPath.c_str());
 			break;
 		}
 		case IDC_INJECT_UNO:
 		{
-			std::wstring driverPath = currentPath;
-			driverPath += L"\\arduino.exe";
-			OutputDebugString(driverPath.c_str());
+			if (!selectedSerialPort) {
+				MessageBox(NULL, L"포트를 선택해 주세요.", NULL, NULL);
+				break;
+			}
+			if (SP) {
+				SP->disconnect();
+			}
+
+			std::wstring avrPath = currentPath;
+			std::wstring executePath = currentPath;
+			std::wstring callOption = L"";
+			avrPath += L"\\flashing\\avr.exe";
+			executePath += L"\\flashing";
+
+			TCHAR str[100];
+			swprintf_s(str, L"-p m328p -P\\\\.\\COM%d -b115200 -Uflash:w:\"entry.hex\":i -C./avrdude.conf -carduino -D", selectedSerialPort);
+			callOption += str;
+			OutputDebugString(callOption.c_str());
+			executeShellCmd(hWnd,
+				avrPath.c_str(),
+				callOption.c_str(),
+				executePath.c_str());
+			selectedSerialPort = 0;
+			findPorts();
+			drawPaint(hWnd);
+			MessageBox(NULL, L"업로드 완료 후 다시 연결해 주세요.", NULL, NULL);
 			break;
 		}
 		case IDC_INJECT_LEONARDO:
 		{
-			std::wstring driverPath = currentPath;
-			driverPath += L"\\arduino.exe";
-			OutputDebugString(driverPath.c_str());
+			if (SP)
+				SP->disconnect();
+			if (!selectedSerialPort) {
+				MessageBox(NULL, L"포트를 선택해 주세요.", NULL, NULL);
+				break;
+			}
+			std::wstring avrPath = currentPath;
+			std::wstring executePath = currentPath;
+			std::wstring callOption = L"";
+			avrPath += L"\\flashing\\avr.exe";
+			executePath += L"\\flashing";
+
+			TCHAR str[100];
+			swprintf_s(str, L"-patmega32u4 -P\\\\.\\COM%d -b57600 -Uflash:w:\"entry.hex\":i -C./avrdude.conf -cavr109 -D", selectedSerialPort);
+			callOption += str;
+			OutputDebugString(callOption.c_str());
+			executeShellCmd(hWnd,
+				avrPath.c_str(),
+				callOption.c_str(),
+				executePath.c_str());
 			break;
 		}
 		case ID_COMBOBOX:
@@ -312,11 +350,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			*/
 		if (SP && SP->IsConnected())
 			TextOut(hdc,
-				24, 40,
+				10, 45,
 				L"아두이노가 연결되었습니다.", _tcslen(L"아두이노가 연결되었습니다."));
 		else
 			TextOut(hdc,
-			24, 40,
+			10, 45,
 			L"아두이노가 연결되지 않았습니다.", _tcslen(L"아두이노가 연결되지 않았습니다."));
 		EndPaint(hWnd, &ps);
 		break;
@@ -764,12 +802,12 @@ VOID CALLBACK connectSerial(HWND hWnd, int port) {
 		BOOL first, second;
 		first = InputData[0] >> 7;
 		second = InputData[1] >> 7;
-		if ((first || second) && !(first && second)) {
+		//if ((first || second) && !(first && second)) {
 			PostMessage(hWnd, WM_SERIAL, NULL, FD_ACCEPT);
 			MessageBox(NULL, L"아두이노가 연결되었습니다", NULL, NULL);
 			isSerialConnected = true;
 			return;
-		}
+		//}
 	}
 
 	MessageBox(NULL, L"아두이노가 연결에 실패했습니다.", NULL, NULL);
@@ -807,4 +845,11 @@ std::wstring ExePath() {
 	GetModuleFileName(NULL, buffer, MAX_PATH);
 	std::wstring::size_type pos = std::wstring(buffer).find_last_of(L"\\/");
 	return std::wstring(buffer).substr(0, pos);
+}
+
+VOID drawPaint(HWND hWnd) {
+	RECT rect;
+	GetClientRect(hWnd, &rect);
+	InvalidateRect(hWnd, &rect, TRUE);
+	SendMessage(hWnd, WM_PAINT, NULL, NULL);
 }
