@@ -243,6 +243,36 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				L"");
 			break;
 		}
+		case IDC_COMPAT_DRIVER:
+		{
+			std::wstring driverPath = currentPath;
+			driverPath += L"\\arduino.exe";
+			OutputDebugString(driverPath.c_str());
+			executeShellCmd(hWnd,
+				L"C:\\Users\\boolgom\\Develop\\EntryArduino\\EntryArduino\\Debug\\avr.exe",
+				L"");
+			break;
+		}
+		case IDC_INJECT_UNO:
+		{
+			std::wstring driverPath = currentPath;
+			driverPath += L"\\arduino.exe";
+			OutputDebugString(driverPath.c_str());
+			executeShellCmd(hWnd,
+				L"C:\\Users\\boolgom\\Develop\\EntryArduino\\EntryArduino\\Debug\\avr.exe",
+				L"");
+			break;
+		}
+		case IDC_INJECT_LEONARDO:
+		{
+			std::wstring driverPath = currentPath;
+			driverPath += L"\\arduino.exe";
+			OutputDebugString(driverPath.c_str());
+			executeShellCmd(hWnd,
+				L"C:\\Users\\boolgom\\Develop\\EntryArduino\\EntryArduino\\Debug\\avr.exe",
+				L"");
+			break;
+		}
 		case ID_COMBOBOX:
 			switch (wmEvent) {
 			case CBN_DROPDOWN:
