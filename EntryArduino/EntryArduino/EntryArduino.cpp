@@ -46,7 +46,7 @@ VOID CALLBACK InitSocket(HWND hWnd);
 VOID CALLBACK connectSerial(HWND hWnd, int port);
 BOOLEAN CALLBACK ReadSerial();
 VOID findPorts();
-VOID executeShellCmd(HWND hWnd, LPCTSTR file, LPCTSTR option);
+VOID executeShellCmd(HWND hWnd, LPCTSTR file, LPCTSTR option, LPCTSTR path);
 BOOL IsWow64();
 std::wstring ExePath();
 
@@ -236,21 +236,31 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case IDC_ARDUINO_DRIVER:
 		{
 			std::wstring driverPath = currentPath;
-			driverPath += L"\\arduino.exe";
+			std::wstring executePath = currentPath;
+			if (IsWow64())
+				driverPath += L"\\drivers\\arduino\\dpinst-amd64.exe";
+			else
+				driverPath += L"\\drivers\\arduino\\dpinst-x86.exe";
+			executePath += L"\\drivers\\arduino";
 			OutputDebugString(driverPath.c_str());
 			executeShellCmd(hWnd,
-				L"C:\\Users\\boolgom\\Develop\\EntryArduino\\EntryArduino\\Debug\\avr.exe",
-				L"");
+				driverPath.c_str(),
+				L"",
+				executePath.c_str());
 			break;
 		}
 		case IDC_COMPAT_DRIVER:
 		{
 			std::wstring driverPath = currentPath;
-			driverPath += L"\\arduino.exe";
+			std::wstring executePath = currentPath;
+			driverPath += L"\\drivers\\compat\\SETUP.EXE";
+			executePath += L"\\drivers\\compat";
 			OutputDebugString(driverPath.c_str());
 			executeShellCmd(hWnd,
-				L"C:\\Users\\boolgom\\Develop\\EntryArduino\\EntryArduino\\Debug\\avr.exe",
-				L"");
+				driverPath.c_str(),
+				L"",
+				executePath.c_str());
+			OutputDebugString(driverPath.c_str());
 			break;
 		}
 		case IDC_INJECT_UNO:
@@ -258,9 +268,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			std::wstring driverPath = currentPath;
 			driverPath += L"\\arduino.exe";
 			OutputDebugString(driverPath.c_str());
-			executeShellCmd(hWnd,
-				L"C:\\Users\\boolgom\\Develop\\EntryArduino\\EntryArduino\\Debug\\avr.exe",
-				L"");
 			break;
 		}
 		case IDC_INJECT_LEONARDO:
@@ -268,9 +275,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			std::wstring driverPath = currentPath;
 			driverPath += L"\\arduino.exe";
 			OutputDebugString(driverPath.c_str());
-			executeShellCmd(hWnd,
-				L"C:\\Users\\boolgom\\Develop\\EntryArduino\\EntryArduino\\Debug\\avr.exe",
-				L"");
 			break;
 		}
 		case ID_COMBOBOX:
@@ -772,8 +776,8 @@ VOID CALLBACK connectSerial(HWND hWnd, int port) {
 	PostMessage(hWnd, WM_SERIAL, NULL, FD_CLOSE);
 }
 
-VOID executeShellCmd(HWND hWnd, LPCTSTR file, LPCTSTR option) {
-	ShellExecute(hWnd, NULL, file, option, currentPath.c_str(), SW_SHOW);
+VOID executeShellCmd(HWND hWnd, LPCTSTR file, LPCTSTR option, LPCTSTR path) {
+	ShellExecute(hWnd, NULL, file, option, path, SW_SHOW);
 }
 
 BOOL IsWow64()
