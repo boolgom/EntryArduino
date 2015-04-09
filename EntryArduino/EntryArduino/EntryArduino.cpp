@@ -229,6 +229,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case IDM_ABOUT:
 			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
 			break;
+		case IDM_HELP:
+			DialogBox(hInst, MAKEINTRESOURCE(IDD_HELPBOX), hWnd, About);
+			break;
 		case IDM_EXIT:
 			if (SP && SP->IsConnected())
 				SP->disconnect();
@@ -264,7 +267,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case IDC_INJECT_UNO:
 		{
 			if (!selectedSerialPort) {
-				MessageBox(NULL, L"포트를 선택해 주세요.", NULL, NULL);
+				MessageBox(NULL, L"포트를 선택해 주세요.", L"포트 선택되지 않음", NULL);
 				break;
 			}
 			if (SP) {
@@ -288,7 +291,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			selectedSerialPort = 0;
 			findPorts();
 			drawPaint(hWnd);
-			MessageBox(NULL, L"업로드 완료 후 다시 연결해 주세요.", NULL, NULL);
+			MessageBox(NULL, L"업로드 완료 후 다시 연결해 주세요.", L"주의", NULL);
 			break;
 		}
 		case IDC_INJECT_LEONARDO:
@@ -296,7 +299,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			if (SP)
 				SP->disconnect();
 			if (!selectedSerialPort) {
-				MessageBox(NULL, L"포트를 선택해 주세요.", NULL, NULL);
+				MessageBox(NULL, L"포트를 선택해 주세요.", L"에러", NULL);
 				break;
 			}
 			std::wstring avrPath = currentPath;
@@ -804,13 +807,13 @@ VOID CALLBACK connectSerial(HWND hWnd, int port) {
 		second = InputData[1] >> 7;
 		//if ((first || second) && !(first && second)) {
 			PostMessage(hWnd, WM_SERIAL, NULL, FD_ACCEPT);
-			MessageBox(NULL, L"아두이노가 연결되었습니다", NULL, NULL);
+			MessageBox(NULL, L"아두이노가 연결되었습니다", L"연결 성공", NULL);
 			isSerialConnected = true;
 			return;
 		//}
 	}
 
-	MessageBox(NULL, L"아두이노가 연결에 실패했습니다.", NULL, NULL);
+	MessageBox(NULL, L"아두이노가 연결에 실패했습니다.", L"연결 실패", NULL);
 	PostMessage(hWnd, WM_SERIAL, NULL, FD_CLOSE);
 }
 
