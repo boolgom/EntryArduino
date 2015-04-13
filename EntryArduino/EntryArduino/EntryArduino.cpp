@@ -764,8 +764,8 @@ VOID findPorts() {
 	{
 		for (i = 0; i < ports.GetSize(); i++){
 
-			char friendlyname[30];
-			TCHAR fdn[30] = { 0, };
+			char friendlyname[MAX_LOADSTRING];
+			TCHAR fdn[MAX_LOADSTRING] = { 0, };
 			sprintf_s(friendlyname, "(COM%u) %S", ports[i], friendlyNames[i]);
 			MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, friendlyname, strlen(friendlyname), fdn, 256);
 			SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)fdn);
