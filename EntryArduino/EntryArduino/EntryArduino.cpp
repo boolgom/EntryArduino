@@ -294,6 +294,36 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			MessageBox(NULL, L"업로드 완료 후 다시 연결해 주세요.", L"주의", NULL);
 			break;
 		}
+		case IDC_INJECT_ENTRY:
+		{
+			if (!selectedSerialPort) {
+				MessageBox(NULL, L"포트를 선택해 주세요.", L"포트 선택되지 않음", NULL);
+				break;
+			}
+			if (SP) {
+				SP->disconnect();
+			}
+
+			std::wstring avrPath = currentPath;
+			std::wstring executePath = currentPath;
+			std::wstring callOption = L"";
+			avrPath += L"\\flashing\\avr.exe";
+			executePath += L"\\flashing";
+
+			TCHAR str[100];
+			swprintf_s(str, L"-p m328p -P\\\\.\\COM%d -b115200 -Uflash:w:\"board.hex\":i -C./avrdude.conf -carduino -D", selectedSerialPort);
+			callOption += str;
+			OutputDebugString(callOption.c_str());
+			executeShellCmd(hWnd,
+				avrPath.c_str(),
+				callOption.c_str(),
+				executePath.c_str());
+			selectedSerialPort = 0;
+			findPorts();
+			drawPaint(hWnd);
+			MessageBox(NULL, L"업로드 완료 후 다시 연결해 주세요.", L"주의", NULL);
+			break;
+		}
 		case IDC_INJECT_LEONARDO:
 		{
 			if (SP)
