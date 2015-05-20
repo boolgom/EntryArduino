@@ -768,14 +768,6 @@ VOID UpdateValue(char * inputData, int dataLength)
 					int port = (remainSerialValue >> 3) & 0x07;
 					analogValue[port] = ((remainSerialValue & 0x07) << 7) +
 						(data & 0x7F);
-					if (port == 1) {
-						TCHAR s[256];
-
-						
-						_stprintf_s(s, _T("There is %d numbers\n"), analogValue[1]);
-
-						OutputDebugString(s);
-					}
 				}
 				else
 				{
