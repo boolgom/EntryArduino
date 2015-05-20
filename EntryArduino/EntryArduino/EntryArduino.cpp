@@ -44,7 +44,7 @@ INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
 VOID UpdateValue(char * inputData, int dataLength);
 VOID CALLBACK InitSocket(HWND hWnd);
 VOID CALLBACK connectSerial(HWND hWnd, int port);
-BOOLEAN CALLBACK ReadSerial();
+BOOLEAN ReadSerial();
 VOID findPorts();
 VOID executeShellCmd(HWND hWnd, LPCTSTR file, LPCTSTR option, LPCTSTR path);
 BOOL IsWow64();
@@ -637,7 +637,7 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	return (INT_PTR)FALSE;
 }
 
-BOOLEAN CALLBACK ReadSerial()
+BOOLEAN ReadSerial()
 {
 	// Receive until the peer shuts down the connection
 	int dataLength = BUFFER_SIZE;
@@ -768,6 +768,12 @@ VOID UpdateValue(char * inputData, int dataLength)
 					int port = (remainSerialValue >> 3) & 0x07;
 					analogValue[port] = ((remainSerialValue & 0x07) << 7) +
 						(data & 0x7F);
+					TCHAR s[256];
+
+
+					_stprintf_s(s, _T("There is %d : %d\n"), port, analogValue[port]);
+
+					OutputDebugString(s);
 				}
 				else
 				{

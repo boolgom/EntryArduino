@@ -45,10 +45,22 @@ Serial::Serial(char *portName)
 		else
 		{
 			//Define serial connection parameters for the arduino board
-			dcbSerialParams.BaudRate = CBR_38400;
+			dcbSerialParams.BaudRate = CBR_9600;
 			dcbSerialParams.ByteSize = 8;
 			dcbSerialParams.StopBits = ONESTOPBIT;
 			dcbSerialParams.Parity = NOPARITY;
+
+			COMMTIMEOUTS timeouts = { 0 };
+
+			timeouts.ReadIntervalTimeout = 50;
+			timeouts.ReadTotalTimeoutConstant = 50;
+			timeouts.ReadTotalTimeoutMultiplier = 10;
+			timeouts.WriteTotalTimeoutConstant = 50;
+			timeouts.WriteTotalTimeoutMultiplier = 10;
+
+			if (!SetCommTimeouts(hSerial, &timeouts)){
+				// 에러발생
+			}
 
 			//Set the parameters and check for their proper application
 			if (!SetCommState(hSerial, &dcbSerialParams))
