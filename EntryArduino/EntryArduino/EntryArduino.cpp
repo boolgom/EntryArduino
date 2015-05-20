@@ -768,6 +768,14 @@ VOID UpdateValue(char * inputData, int dataLength)
 					int port = (remainSerialValue >> 3) & 0x07;
 					analogValue[port] = ((remainSerialValue & 0x07) << 7) +
 						(data & 0x7F);
+					if (port == 1) {
+						TCHAR s[256];
+
+						
+						_stprintf_s(s, _T("There is %d numbers\n"), analogValue[1]);
+
+						OutputDebugString(s);
+					}
 				}
 				else
 				{
@@ -831,10 +839,12 @@ VOID CALLBACK connectSerial(HWND hWnd, int port) {
 	{
 		int dataLength = BUFFER_SIZE;
 		ZeroMemory(InputData, sizeof(InputData));
+		/*
 		SP->ReadData(InputData, dataLength);
 		BOOL first, second;
 		first = InputData[0] >> 7;
 		second = InputData[1] >> 7;
+		*/
 		//if ((first || second) && !(first && second)) {
 			PostMessage(hWnd, WM_SERIAL, NULL, FD_ACCEPT);
 			MessageBox(NULL, L"아두이노가 연결되었습니다", L"연결 성공", NULL);
