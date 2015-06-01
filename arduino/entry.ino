@@ -1,7 +1,7 @@
 char remainData;
 
 void setup(){
-  Serial.begin(38400);
+  Serial.begin(9600);
   Serial.flush();
   initPorts();
 }
